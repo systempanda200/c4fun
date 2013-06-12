@@ -61,7 +61,7 @@ int main() {
 
     // Runs read's thread
     pthread_t read_thread;
-    if (pthread_create(&read_thread, NULL, read, alloc_start)) {
+    if (pthread_create(&read_thread, NULL, readWrite, alloc_start)) {
 	printf("Failed to create read's thread\n");
 	return -1;
     }
