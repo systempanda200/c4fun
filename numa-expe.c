@@ -18,11 +18,16 @@ void setCPUAffinity(int core) {
     }
 }
 
-void *alloc(void *param) {
+// Allocate and touch every memory pages
+void *allocAndTouch(void *param) {
     setCPUAffinity(ALLOCATION_CORE);
     int *alloc_start;
     void *result = malloc(ALLOCATION_SIZE * sizeof(int));
-    printf("Allocation done\n");
+    int i;
+    for (i = 0; i < ALLOCATION_SIZE; i++) {
+	*(alloc_start + i) = i;
+    }
+    printf("Allocation done\n");  
     return result;
 }
 
@@ -43,7 +48,7 @@ int main() {
 
     // Runs allocation's thread on ALLOCATION_CORE
     pthread_t alloc_thread;
-    if (pthread_create(&alloc_thread, NULL, alloc, NULL)) {
+    if (pthread_create(&alloc_thread, NULL, allocAndTouch, NULL)) {
 	printf("Failed to create allocation's thread\n");
 	return -1;
     }
@@ -51,12 +56,6 @@ int main() {
     if (pthread_join(alloc_thread, (void **)(&alloc_start))) {
 	printf("Failed to join allocation's thread\n");
 	return -1;
-    }
-
-    // Write integers in allocated memory
-    int i;
-    for (i = 0; i < ALLOCATION_SIZE; i++) {
-	*(alloc_start + i) = i;
     }
 
     // Runs read's thread
