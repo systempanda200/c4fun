@@ -4,7 +4,7 @@
 #include <sys/time.h>
 #include <numaif.h>
 
-#define ALLOCATION_SIZE 20000000 // 20 Mega bytes * size of int
+#define ALLOCATION_SIZE 20000000 // 20 mega bytes * size of int
 #define ALLOCATION_CORE 0
 #define NB_CORES 12
 #define NB_ITERATIONS 20
