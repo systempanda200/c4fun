@@ -1,11 +1,19 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <numaif.h>
 
-#define ALLOCATION_SIZE 200000000 // 200 Mega bytes
+#define ALLOCATION_SIZE 20000000 // 20 Mega bytes * size of int
 #define ALLOCATION_CORE 0
+#define NB_CORES 12
+#define NB_ITERATIONS 20
 
 int read_core = 0;
+int global_data_1[1000];
+int global_data_2[1000];
+void *global_data;
+int global_data_core;
 
 // Set CPU affinity for current thread
 void setCPUAffinity(int core) {
@@ -18,16 +26,28 @@ void setCPUAffinity(int core) {
     }
 }
 
+// Check global data allocation location
+void *checkGlobalAlloc(void *param) {
+    setCPUAffinity(global_data_core);
+    *((int *)global_data) = 14;
+    int numa_node = -1;
+    get_mempolicy(&numa_node, NULL, 0, global_data, MPOL_F_NODE | MPOL_F_ADDR);
+    printf("Global data allocated on NUMA node %d with first touch on core %d\n", numa_node, global_data_core);
+}
+
 // Allocate and touch every memory pages
 void *allocAndTouch(void *param) {
     setCPUAffinity(ALLOCATION_CORE);
-    int *alloc_start;
     void *result = malloc(ALLOCATION_SIZE * sizeof(int));
+    if (result == NULL) {
+      printf("Memory allocation (size = %d) failed\n", ALLOCATION_SIZE * sizeof(int));
+      exit(-1);
+    }
     int i;
     for (i = 0; i < ALLOCATION_SIZE; i++) {
-	*(alloc_start + i) = i;
+      *(int *)(result + i) = i;
     }
-    printf("Allocation done\n");  
+    printf("Allocation of %d bytes done\n", ALLOCATION_SIZE * sizeof(int));  
     return result;
 }
 
@@ -35,16 +55,53 @@ void *readWrite(void *param) {
     setCPUAffinity(read_core);
     int *alloc_start = (int *)param;
     int a, i, j;
-    for (j = 0; j < 10; j++) {
+    struct timeval t1, t2;
+    double elapsedTime;
+    gettimeofday(&t1, NULL);
+    for (j = 0; j < NB_ITERATIONS; j++) {
 	for (i = 0; i < ALLOCATION_SIZE; i++) {
-	    a = *(alloc_start + i);
+	  a = *(alloc_start + (i * 1009l) %ALLOCATION_SIZE);
 	}
     }
-    printf("Read thread ended\n");
-    return (void *)a;
+    gettimeofday(&t2, NULL);
+    elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
+    elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+    printf("Read and write from core %2d on core %2d ==> %0.3f\n", read_core, ALLOCATION_CORE, elapsedTime);
+    return NULL;
 }
 
 int main() {
+
+    // Check we are on a NUMA system
+    if (numa_available() == -1) {
+      printf("System is not NUMA, exiting !\n");
+      return -1;
+    }
+    printf("The NUMA world is %d big\n", numa_num_configured_nodes());
+
+    // Check where global data is allocated 
+    pthread_t check_alloc_thread;
+    global_data = global_data_1;
+    global_data_core = 0;
+    if (pthread_create(&check_alloc_thread, NULL, checkGlobalAlloc, NULL)) {
+	printf("Failed to create check allocation's thread\n");
+	return -1;
+    }
+    if (pthread_join(check_alloc_thread, NULL)) {
+	printf("Failed to join check allocation's thread\n");
+	return -1;
+    }
+    global_data = global_data_2;
+    global_data_core = 7;
+    if (pthread_create(&check_alloc_thread, NULL, checkGlobalAlloc, NULL)) {
+	printf("Failed to create check allocation's thread\n");
+	return -1;
+    }
+    if (pthread_join(check_alloc_thread, NULL)) {
+	printf("Failed to join check allocation's thread\n");
+	return -1;
+    }
+
 
     // Runs allocation's thread on ALLOCATION_CORE
     pthread_t alloc_thread;
@@ -58,17 +115,22 @@ int main() {
 	return -1;
     }
 
-    // Runs read's thread
-    pthread_t read_thread;
-    if (pthread_create(&read_thread, NULL, readWrite, alloc_start)) {
+    
+    // Itterate over cores
+    for (read_core = 0; read_core < NB_CORES; read_core++) {
+
+      // Runs read's and write thread
+      pthread_t read_thread;
+      if (pthread_create(&read_thread, NULL, readWrite, alloc_start)) {
 	printf("Failed to create read's thread\n");
 	return -1;
-    }
+      }
 
-    // Joins read thread
-    if (pthread_join(alloc_thread, NULL)) {
+      // Joins read and write thread
+      if (pthread_join(alloc_thread, NULL)) {
 	printf("Failed to join read's thread\n");
 	return -1;
+      }
     }
 
     return 0;
