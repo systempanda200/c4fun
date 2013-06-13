@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <numaif.h>
+#include <stdint.h>
 
 #define ALLOCATION_SIZE 20000000 // 20 mega bytes * size of int
 #define ALLOCATION_CORE 0
@@ -27,12 +28,21 @@ void setCPUAffinity(int core) {
 }
 
 // Check global data allocation location
-void *checkGlobalAlloc(void *param) {
+void *checkGlobalAlloc(void *param) { 
     setCPUAffinity(global_data_core);
+    uintptr_t ptr = (uintptr_t)global_data;
+    if (ptr % 4096 != 0) {
+      ptr = ptr + (8 - ptr % 4096);
+    }
     *((int *)global_data) = 14;
-    int numa_node = -1;
-    get_mempolicy(&numa_node, NULL, 0, global_data, MPOL_F_NODE | MPOL_F_ADDR);
-    printf("Global data allocated on NUMA node %d with first touch on core %d\n", numa_node, global_data_core);
+    /* int numa_node = -1; */
+    /* get_mempolicy(&numa_node, NULL, 0, global_data, MPOL_F_NODE | MPOL_F_ADDR); */
+    /* printf("Global data allocated on NUMA node %d with first touch on core %d\n", numa_node, global_data_core); */
+    int status[1];
+    int ret_code;
+    status[0] = -1;
+    ret_code = move_pages(0 /*self memory */, 1, &ptr, NULL, status, 0);
+    printf("Memory at %p is at %d node (retcode %d)\n", global_data, status[0], ret_code);
 }
 
 // Allocate and touch every memory pages
