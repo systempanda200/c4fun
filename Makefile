@@ -1,13 +1,4 @@
 #
-# Variables:
-#
-CC = gcc
-BIN = numa-expe
-SRC = numa-expe.c
-OBJ = numa-expe.o
-
-
-#
 # Flags d'erreurs:
 #
 ERROR_CFLAGS = -Wall -W -pedantic
@@ -18,7 +9,6 @@ ERROR_CFLAGS = -Wall -W -pedantic
 #
 CFLAGS = $(ERROR_FLAGS) -D_REENTRANT -DLinux -D_GNU_SOURCE
 
-
 #
 # Flags pour l'editeur de liens:
 #
@@ -26,17 +16,20 @@ LDFLAGS = $(ERROR_FLAGS) -lpthread -lnuma
 
 
 #
-# Construction du programme:
+# Construction des programmes:
 #
-all: $(BIN)
+all: clean numa-exp cpuid
 
-$(BIN): $(SRC)
-	$(CC) $(CFLAGS) -c $(SRC)
-	$(CC) -o $(BIN) $(OBJ) $(LDFLAGS)
+numa-exp:
+	$(CC) $(CFLAGS) -c numa-expe.c
+	$(CC) -o numa-expe numa-expe.o $(LDFLAGS)
 
+cpuid:
+	$(CC) $(CFLAGS) -c cpuid.c
+	$(CC) -o cpuid cpuid.o $(LDFLAGS)
 
 #
 # Nettoyage:
 #
 clean:
-	rm -f *.o *~ core $(BIN)
+	rm -f *.o *~ core numa-expe cpuid
