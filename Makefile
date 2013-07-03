@@ -3,7 +3,6 @@
 #
 ERROR_CFLAGS = -Wall -W -pedantic
 
-
 #
 # Flags pour le compilateur:
 #
@@ -14,17 +13,16 @@ CFLAGS = $(ERROR_FLAGS) -D_REENTRANT -DLinux -D_GNU_SOURCE
 #
 LDFLAGS = $(ERROR_FLAGS) -lpthread -lnuma
 
-
 #
 # Construction des programmes:
 #
-all: clean numa-exp cpuid
+all: numa-expe cpuid
 
-numa-exp:
+numa-expe: numa-expe.c
 	$(CC) $(CFLAGS) -c numa-expe.c
 	$(CC) -o numa-expe numa-expe.o $(LDFLAGS)
 
-cpuid:
+cpuid: cpuid.c
 	$(CC) $(CFLAGS) -c cpuid.c
 	$(CC) -o cpuid cpuid.o $(LDFLAGS)
 
