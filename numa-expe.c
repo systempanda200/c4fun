@@ -2,7 +2,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <numaif.h>
+#include <numa.h>
 #include <stdint.h>
 #include <errno.h>
 
@@ -11,11 +11,12 @@
 #define NB_CORES 12
 #define NB_ITERATIONS 20
 
-int read_core = 0;
-int global_data_1[1000];
-int global_data_2[1000];
+char global_data_1[4096];
+char global_data_2[4096];
 void *global_data;
 int global_data_core;
+int read_core = 0;
+
 
 // Set CPU affinity for current thread
 void setCPUAffinity(int core) {
@@ -31,41 +32,17 @@ void setCPUAffinity(int core) {
 // Check global data allocation location
 void *checkGlobalAlloc(void *param) {
     setCPUAffinity(global_data_core);
+    *((int *)global_data) = 12;
     uintptr_t ptr = (uintptr_t)global_data;
-    /* if (ptr % 4096 != 0) { */
-    /* 	ptr = ptr + (8 - ptr % 4096); */
-    /* } */
-    /* *((int *)global_data) = 14; */
-    int status[1];
-    int ret_code;
-    status[0] = -1;
-    ret_code = move_pages(0 /*self memory */, 1, &ptr, NULL, status, 0);
-    /* if (move_pages(0 /\*self memory *\/, 1, &ptr, NULL, status, 0)) { */
-    /* 	printf("Move pages error %s\n", strerror(errno)); */
-    /* 	exit(-1); */
-    /* } */
-
-    int *node1 = (int *)numa_alloc_onnode(4096, 0);
-    //int *node1 = (int *)malloc(4096);
-    if (node1 == NULL) {
-	printf("Numa allocation error %d\n", errno);
-	//	exit(-1);
-    }
-    //    *node1 = 12;
-
-    /* int numa_node = -1; */
-    /* get_mempolicy(&numa_node, NULL, 0, node1, MPOL_F_NODE | MPOL_F_ADDR); */
-    /* printf("Memory at %p is on %d node %d\n", node1, numa_node); */
-
-    ptr = (uintptr_t)node1;
     if (ptr % 4096 != 0) {
     	ptr = ptr - ptr % 4096;
     }
+    int status[0];
     if (move_pages(0 /*self memory */, 1, &ptr, NULL, status, 0)) {
     	printf("Move pages error %s\n", strerror(errno));
     	exit(-1);
     }
-    printf("Memory at %p is on %d node\n", ptr, status[0]);
+    printf("Memory at %p first touched on core %d is on %d node\n", ptr, global_data_core, status[0]);
 }
 
 // Allocate and touch every memory pages
@@ -113,27 +90,27 @@ int main() {
     printf("The NUMA world is %d big\n", numa_num_configured_nodes());
 
     // Check where global data is allocated
-    pthread_t check_alloc_thread;
-    global_data = global_data_1;
-    global_data_core = 0;
-    if (pthread_create(&check_alloc_thread, NULL, checkGlobalAlloc, NULL)) {
-	printf("Failed to create check allocation's thread\n");
-	return -1;
-    }
-    if (pthread_join(check_alloc_thread, NULL)) {
-	printf("Failed to join check allocation's thread\n");
-	return -1;
-    }
-    global_data = global_data_2;
-    global_data_core = 7;
-    if (pthread_create(&check_alloc_thread, NULL, checkGlobalAlloc, NULL)) {
-	printf("Failed to create check allocation's thread\n");
-	return -1;
-    }
-    if (pthread_join(check_alloc_thread, NULL)) {
-	printf("Failed to join check allocation's thread\n");
-	return -1;
-    }
+    /* pthread_t check_alloc_thread; */
+    /* global_data = global_data_1; */
+    /* global_data_core = 6; */
+    /* if (pthread_create(&check_alloc_thread, NULL, checkGlobalAlloc, NULL)) { */
+    /* 	printf("Failed to create check allocation's thread\n"); */
+    /* 	return -1; */
+    /* } */
+    /* if (pthread_join(check_alloc_thread, NULL)) { */
+    /* 	printf("Failed to join check allocation's thread\n"); */
+    /* 	return -1; */
+    /* } */
+    /* global_data = global_data_2; */
+    /* global_data_core = 0; */
+    /* if (pthread_create(&check_alloc_thread, NULL, checkGlobalAlloc, NULL)) { */
+    /* 	printf("Failed to create check allocation's thread\n"); */
+    /* 	return -1; */
+    /* } */
+    /* if (pthread_join(check_alloc_thread, NULL)) { */
+    /* 	printf("Failed to join check allocation's thread\n"); */
+    /* 	return -1; */
+    /* } */
 
 
     // Runs allocation's thread on ALLOCATION_CORE
@@ -149,7 +126,7 @@ int main() {
     }
 
 
-    // Itterate over cores
+    // Iterate over cores
     for (read_core = 0; read_core < NB_CORES; read_core++) {
 
 	// Runs read's and write thread
