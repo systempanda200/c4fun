@@ -16,7 +16,7 @@ LDFLAGS = $(ERROR_FLAGS) -lpthread -lnuma
 #
 # Construction des programmes:
 #
-all: numa-expe cpuid
+all: clean numa-expe cpuid
 
 numa-expe: numa-expe.c
 	$(CC) $(CFLAGS) -c numa-expe.c
