@@ -10,9 +10,9 @@ ERROR_CFLAGS = --std=gnu99 -Wall
 
 default: fifo.c fifo.h main.c
 	gcc $(ERROR_CFLAGS) -c fifo.c
+	gcc $(ERROR_CFLAGS) -c blockingfifo.c
 	gcc $(ERROR_CFLAGS) -c main.c
 	gcc -o $(EXECUTABLE_NAME) main.o fifo.o -lpthread
-
 
 #
 # Nettoyage:

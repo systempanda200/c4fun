@@ -1,8 +1,8 @@
-#include "fifo.h"
+#include "blockingfifo.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-void* fifo_init(fifo_t *fifo, int size)
+void* fifo_init(blocking_fifo_t *fifo, int size)
 {
   fifo -> size = size;
   fifo -> data = malloc(sizeof(int) * size);
@@ -11,7 +11,7 @@ void* fifo_init(fifo_t *fifo, int size)
   return fifo -> data;
 }
 
-void fifo_push(fifo_t *fifo, int elem)
+void fifo_push(blocking_fifo_t *fifo, int elem)
 {
   pthread_rwlock_wrlock(&fifo -> rwlock);
   ++(fifo -> head);
@@ -23,7 +23,7 @@ void fifo_push(fifo_t *fifo, int elem)
   pthread_rwlock_unlock(&fifo -> rwlock);
 }
 
-int fifo_pop(fifo_t *fifo)
+int fifo_pop(blocking_fifo_t *fifo)
 {
   pthread_rwlock_rdlock(&fifo -> rwlock);
   if (fifo -> head < 0) {
