@@ -16,7 +16,7 @@ LDFLAGS = $(ERROR_FLAGS) -lpthread -lnuma
 #
 # Construction des programmes:
 #
-all: clean numa-expe cpuid perf_open
+all: clean numa-expe cpuid
 
 numa-expe: numa-expe.c
 	$(CC) $(CFLAGS) -c numa-expe.c
@@ -26,13 +26,8 @@ cpuid: cpuid.c
 	$(CC) $(CFLAGS) -c cpuid.c
 	$(CC) -o cpuid cpuid.o $(LDFLAGS)
 
-perf_open: perf_open.c
-	$(CC) $(CFLAGS) -c perf_open.c
-	$(CC) -o perf_open perf_open.o $(LDFLAGS)
-
-
 #
 # Nettoyage:
 #
 clean:
-	rm -f *.o *~ core numa-expe cpuid perf_open
+	rm -f *.o *~ core numa-expe cpuid
