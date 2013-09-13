@@ -64,3 +64,4 @@ auto
 # Files specific to this project
 numa-expe
 cpuid
+perf_open
