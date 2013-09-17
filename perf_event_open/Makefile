@@ -1,7 +1,7 @@
 #
 # Flags d'erreurs:
 #
-ERROR_CFLAGS = -Wall -W -pedantic
+ERROR_FLAGS = -std=gnu99 -Wall -W -pedantic
 
 #
 # Flags pour le compilateur:
@@ -19,8 +19,8 @@ LDFLAGS = $(ERROR_FLAGS) -lpthread -lnuma
 all: clean perf_event_open
 
 perf_event_open: perf_event_open.c
-	$(CC) $(CFLAGS) -c perf_event_open.c
-	$(CC) -o perf_event_open perf_event_open.o $(LDFLAGS)
+	gcc $(CFLAGS) -c perf_event_open.c
+	gcc -o perf_event_open perf_event_open.o $(LDFLAGS)
 
 #
 # Nettoyage:
