@@ -17,9 +17,10 @@
 
 #include "numemp.h"
 
-int nb_numa_nodes;
+unsigned int nb_numa_nodes;
 int pfm_init_res;
 int pfm_encoding_res;
+int numa_node_to_cpu[MAX_NB_NUMA_NODES];
 
 __attribute__((constructor)) void init(void) {
 
@@ -29,6 +30,22 @@ __attribute__((constructor)) void init(void) {
     nb_numa_nodes = -1;
   } else {
     nb_numa_nodes = numa_num_configured_nodes();
+    int nb_cpus = numa_num_configured_cpus();
+    struct bitmask *mask = numa_bitmask_alloc(nb_cpus);
+    for (int node = 0; node < nb_numa_nodes; node++) {
+      numa_node_to_cpus(node, mask);
+      numa_node_to_cpu[node] = -1;
+      for (int cpu = 0; cpu < nb_cpus; cpu++) {
+	if (*(mask->maskp) & (1 << cpu)) {
+	  numa_node_to_cpu[node] = cpu;
+	  printf("Node %d can be accessed by cpu %d\n", node, cpu);
+	  break;
+	}
+      }
+      if (numa_node_to_cpu[node] == -1) {
+	nb_numa_nodes = -1; // to be handled properly
+      }
+    }
   }
 
   // Initializes pfm
@@ -75,7 +92,7 @@ int numemp_start(struct numemp_measure *measure) {
   arg.attr = &attr;
   char *fstr = "this string will hold the complete event string after call to pfm_get_os_event_encoding";
   arg.fstr = &fstr;
-  pfm_encoding_res = pfm_get_os_event_encoding("UNC_QMC_NORMAL_READS", PFM_PLM3, PFM_OS_PERF_EVENT, &arg);
+  pfm_encoding_res = pfm_get_os_event_encoding("UNC_QMC_NORMAL_READS", PFM_PLM0, PFM_OS_PERF_EVENT, &arg);
   //pfm_encoding_res = pfm_get_os_event_encoding("INSTRUCTIONS", PFM_PLM0 | PFM_PLM3, PFM_OS_PERF_EVENT, &arg);
   attr.size = sizeof(struct perf_event_attr);
   if (pfm_encoding_res != PFM_SUCCESS) {
@@ -84,7 +101,7 @@ int numemp_start(struct numemp_measure *measure) {
   printf("Fully qualified event string: %s\n", *arg.fstr);
 
   // Open the event with Linux system call
-  measure->fd = perf_event_open(&attr, 0, -1, -1, 0);
+  measure->fd = perf_event_open(&attr, -1, 1, -1, 0);
   if(measure->fd == -1) {
     return ERROR_PERF_EVENT_OPEN;
   }

@@ -1,4 +1,4 @@
-#define MAX_NB_NUMA_NODES
+#define MAX_NB_NUMA_NODES     16
 
 #define ERROR_NUMA_LIB        -1
 #define ERROR_PFM_INIT        -2
