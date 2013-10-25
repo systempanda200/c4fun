@@ -9,7 +9,7 @@ int main() {
     printf("Error : %s\n", numemp_error_message(res));
     return -1;
   }
-  //sleep(3);
+  sleep(5);
   numemp_stop(&m);
   for(int i = 0; i < m.nb_nodes; i++) {
     printf("Memory bandwidth for node %d is %lld\n", i, m.nodes_bandwidth[i]);
@@ -20,7 +20,7 @@ int main() {
     printf("Error : %s\n", numemp_error_message(res));
     return -1;
   }
-  //sleep(2);
+  sleep(15);
   numemp_stop(&m);
   for(int i = 0; i < m.nb_nodes; i++) {
     printf("Memory bandwidth for node %d is %lld\n", i, m.nodes_bandwidth[i]);
