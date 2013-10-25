@@ -6,8 +6,8 @@
 #define ERROR_PERF_EVENT_OPEN -4
 
 struct numemp_measure {
-  long fd;
   int nb_nodes;
+  long fd[MAX_NB_NUMA_NODES];
   long long nodes_bandwidth[MAX_NB_NUMA_NODES];
 };
 

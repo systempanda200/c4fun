@@ -100,21 +100,28 @@ int numemp_start(struct numemp_measure *measure) {
   }
   printf("Fully qualified event string: %s\n", *arg.fstr);
 
-  // Open the event with Linux system call
-  measure->fd = perf_event_open(&attr, -1, 1, -1, 0);
-  if(measure->fd == -1) {
-    return ERROR_PERF_EVENT_OPEN;
+
+  // Open the events on each NUMA node with Linux system call
+  for (int node = 0; node < nb_numa_nodes; node++) {
+    measure->fd[node] = perf_event_open(&attr, -1, 1, -1, 0);
+    if(measure->fd[node] == -1) {
+      return ERROR_PERF_EVENT_OPEN;
+    }
   }
 
   // Starts measure
-  ioctl(measure->fd, PERF_EVENT_IOC_RESET, 0);
-  ioctl(measure->fd, PERF_EVENT_IOC_ENABLE, 0);
+  for (int node = 0; node < nb_numa_nodes; node++) {
+    ioctl(measure->fd[node], PERF_EVENT_IOC_RESET, 0);
+    ioctl(measure->fd[node], PERF_EVENT_IOC_ENABLE, 0);
+  }
 
   return 0;
 }
 
 void numemp_stop(struct numemp_measure *measure) {
-  ioctl(measure->fd, PERF_EVENT_IOC_DISABLE, 0);
-  read(measure->fd, &measure->nodes_bandwidth[0], sizeof(long long));
-  close(measure->fd);
+  for (int node = 0; node < nb_numa_nodes; node++) {
+    ioctl(measure->fd[node], PERF_EVENT_IOC_DISABLE, 0);
+    read(measure->fd[node], &measure->nodes_bandwidth[node], sizeof(long long));
+    close(measure->fd[node]);
+  }
 }
