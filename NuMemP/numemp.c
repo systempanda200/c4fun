@@ -103,7 +103,7 @@ int numemp_start(struct numemp_measure *measure) {
 
   // Open the events on each NUMA node with Linux system call
   for (int node = 0; node < nb_numa_nodes; node++) {
-    measure->fd[node] = perf_event_open(&attr, -1, 1, -1, 0);
+    measure->fd[node] = perf_event_open(&attr, -1, numa_node_to_cpu[node], -1, 0);
     if(measure->fd[node] == -1) {
       return ERROR_PERF_EVENT_OPEN;
     }
