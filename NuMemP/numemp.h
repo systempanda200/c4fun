@@ -1,9 +1,9 @@
 #define MAX_NB_NUMA_NODES
 
-#define ERROR_NUMA_LIB   -1
-#define ERROR_PFM_INIT   -2
-#define ERROR_PFM_ENCODE -3
-
+#define ERROR_NUMA_LIB        -1
+#define ERROR_PFM_INIT        -2
+#define ERROR_PFM_ENCODE      -3
+#define ERROR_PERF_EVENT_OPEN -4
 
 struct numemp_measure {
   long fd;

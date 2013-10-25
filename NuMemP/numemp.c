@@ -46,6 +46,9 @@ const char * numemp_error_message(int error) {
   case ERROR_PFM_ENCODE :
     return pfm_strerror(pfm_encoding_res);
     break;
+  case ERROR_PERF_EVENT_OPEN :
+    return strerror(errno);
+    break;
   default:
     return "libnumemp: unknown error";
   }
@@ -83,8 +86,7 @@ int numemp_start(struct numemp_measure *measure) {
   // Open the event with Linux system call
   measure->fd = perf_event_open(&attr, 0, -1, -1, 0);
   if(measure->fd == -1) {
-    fprintf(stderr, "Error in perf_event_open \n");
-    exit(EXIT_FAILURE);
+    return ERROR_PERF_EVENT_OPEN;
   }
 
   // Starts measure
