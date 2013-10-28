@@ -95,7 +95,8 @@ int main() {
     // we need a char * to have next line pointer arithmetic working on bytes.
     char * metadata_page_charp = (char *) metadata_page;
     struct perf_event_header *header = (struct perf_event_header *)(metadata_page_charp + page_size);
-    while (1) {
+    int i = 0;
+    while (i < 10) {
       printf("Event type = %d\n", header -> type);
       printf("Event size = %d\n", header -> size);
       if (header -> type == PERF_RECORD_SAMPLE) {
@@ -107,6 +108,7 @@ int main() {
 	printf("  Cpu id = %u\n", sample -> cpuid);
       }
       header = (struct perf_event_header *)((char *)header + header -> size);
+      i++;
     }
 
     /* munmap - close */
