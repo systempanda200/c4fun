@@ -83,8 +83,8 @@ int main() {
     printf("Metada page compat_version = %d\n", metadata_page -> compat_version);
     printf("Metada page time_enabled = %l" PRIu64 "\n", metadata_page -> time_enabled);
     printf("Metada page time_running = %l" PRIu64 "\n", metadata_page -> time_running);
-    unsigned long long head = metadata_page -> data_head;
-    printf("Metada page head = %llu\n", head);
+    uint64_t head = metadata_page -> data_head;
+    printf("Metada page head = %" PRIx64 "\n", head);
     rmb();
 
     char * metadata_page_charp = (char *) metadata_page;
@@ -94,7 +94,7 @@ int main() {
     if (header -> type == PERF_RECORD_SAMPLE) {
 	struct sample *sample = (struct sample *)(metadata_page_charp + page_size + 8);
 	printf("Sample details:\n");
-	printf("  Instruction pointer = %" PRIu64 "\n", sample -> ip);
+	printf("  Instruction pointer = %" PRIx64 "\n", sample -> ip);
 	printf("  Process id = %u\n", sample -> pid);
 	printf("  Thread id = %u\n", sample -> tid);
 	printf("  Cpu id = %u\n", sample -> cpuid);
