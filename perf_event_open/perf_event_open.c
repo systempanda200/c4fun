@@ -34,6 +34,8 @@ char * get_sample_type_name(int type) {
   switch (type) {
   case PERF_RECORD_SAMPLE:
     return "PERF_RECORD_SAMPLE";
+  case PERF_RECORD_MMAP:
+    return "PERF_RECORD_MMAP";
   }
   return NULL;
 }
