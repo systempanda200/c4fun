@@ -1,7 +1,7 @@
 #
 # Flags d'erreurs:
 #
-ERROR_FLAGS = -std=gnu99 -Wall -W -pedantic
+ERROR_FLAGS = -std=gnu99 -Wall -Werror -pedantic
 
 #
 # Flags pour le compilateur:

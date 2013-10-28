@@ -98,7 +98,7 @@ int numemp_start(struct numemp_measure *measure) {
   if (pfm_encoding_res != PFM_SUCCESS) {
     return ERROR_PFM_ENCODE;
   }
-  printf("Fully qualified event string: %s\n", *arg.fstr);
+  //printf("Fully qualified event string: %s\n", *arg.fstr);
 
 
   // Open the events on each NUMA node with Linux system call

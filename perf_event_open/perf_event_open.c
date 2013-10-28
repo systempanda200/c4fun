@@ -37,14 +37,10 @@ int main() {
     size_t page_size;
     int fd;
     int length;
-    void *buffer;
-    struct perf_event_mmap_page *metadata_page;
-    long tid;
-    pid_t pid;
 
     /* Get thread and process id from linux kernel */
-    tid = syscall(SYS_gettid);
-    pid = getpid();
+    long tid = syscall(SYS_gettid);
+    pid_t pid = getpid();
     printf("Process id = %d\n", pid);
     printf("Thread  id = %ld\n", tid);
 
@@ -61,15 +57,15 @@ int main() {
 
     fd = perf_event_open(&pe, 0, -1, -1, 0);
     if (fd == -1) {
-	fprintf(stderr, "Error in perf_event_open \n");
+      fprintf(stderr, "Error in perf_event_open: %s\n", strerror (errno));
 	exit(EXIT_FAILURE);
     }
 
     /* mmap the file descriptor returned by perf_event_open to read the samples */
     page_size = (size_t) sysconf (_SC_PAGESIZE);
     length = page_size + page_size * 64;
-    buffer = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
-    if (buffer == MAP_FAILED) {
+    struct perf_event_mmap_page *metadata_page = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
+    if (metadata_page == MAP_FAILED) {
 	fprintf (stderr, "Couldn't mmap file descriptor: %s - errno = %d\n",
 		 strerror (errno), errno);
 	exit (EXIT_FAILURE);
@@ -83,28 +79,29 @@ int main() {
     ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
 
     /* Reading result */
-    metadata_page = buffer;
     printf("Metada page version = %d\n", metadata_page -> version);
     printf("Metada page compat_version = %d\n", metadata_page -> compat_version);
     printf("Metada page time_enabled = %l" PRIu64 "\n", metadata_page -> time_enabled);
     printf("Metada page time_running = %l" PRIu64 "\n", metadata_page -> time_running);
-    int head = metadata_page -> data_head;
+    unsigned long long head = metadata_page -> data_head;
+    printf("Metada page head = %llu\n", head);
     rmb();
 
-    struct perf_event_header *header = (struct perf_event_header *)(buffer + page_size);
+    char * metadata_page_charp = (char *) metadata_page;
+    struct perf_event_header *header = (struct perf_event_header *)(metadata_page_charp + page_size);
     printf("First event type = %d\n", header -> type);
     printf("First event size = %d\n", header -> size);
     if (header -> type == PERF_RECORD_SAMPLE) {
-	struct sample *sample = (struct sample *)(buffer + page_size + 8);
+	struct sample *sample = (struct sample *)(metadata_page_charp + page_size + 8);
 	printf("Sample details:\n");
-	printf("  Instruction pointer = %0x\n", sample -> ip);
+	printf("  Instruction pointer = %" PRIu64 "\n", sample -> ip);
 	printf("  Process id = %u\n", sample -> pid);
 	printf("  Thread id = %u\n", sample -> tid);
 	printf("  Cpu id = %u\n", sample -> cpuid);
     }
 
     /* munmap - close */
-    if (munmap(buffer, length)) {
+    if (munmap(metadata_page, length)) {
 	fprintf (stderr, "Couldn't unmmap file descriptor: %s - errno = %d\n",
 		 strerror (errno), errno);
 	exit (EXIT_FAILURE);
