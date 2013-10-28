@@ -24,10 +24,19 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 }
 
 struct sample {
-    uint64_t ip;
-    uint32_t pid;
-    uint32_t tid;
-    uint32_t cpuid;
+  uint64_t ip;
+  uint32_t pid;
+  uint32_t tid;
+  uint32_t cpuid;
+};
+
+struct mmap_sample {
+  uint32_t pid;
+  uint32_t tid;
+  uint64_t addr;
+  uint64_t len;
+  uint64_t pgoff;
+  char filename[100];
 };
 
 char * get_sample_type_name(int type) {
@@ -128,6 +137,15 @@ int main() {
 	printf("  Process id = %u\n", sample -> pid);
 	printf("  Thread id = %u\n", sample -> tid);
 	printf("  Cpu id = %u\n", sample -> cpuid);
+      } else if (header -> type == PERF_RECORD_MMAP) {
+	struct mmap_sample *sample = (struct mmap_sample *)((char *)(header) + 8);
+	printf("Sample details:\n");
+	printf("  Process id = %u\n", sample -> pid);
+	printf("  Thread id = %u\n", sample -> tid);
+	printf("  Addr = %" PRIx64 "\n", sample -> addr);
+	printf("  Length = %" PRIx64 "\n", sample -> len);
+	printf("  pgoff = %" PRIx64 "\n", sample -> pgoff);
+	printf("  file name = %s\n", sample -> filename);
       }
       header = (struct perf_event_header *)((char *)header + header -> size);
       i++;
