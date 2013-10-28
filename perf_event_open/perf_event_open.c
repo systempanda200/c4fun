@@ -93,14 +93,13 @@ int main() {
     rmb();
 
     // we need a char * to have next line pointer arithmetic working on bytes.
-    char * metadata_page_charp = (char *) metadata_page;
-    struct perf_event_header *header = (struct perf_event_header *)(metadata_page_charp + page_size);
+    struct perf_event_header *header = (struct perf_event_header *)((char *)metadata_page + page_size);
     int i = 0;
     while (i < 10) {
       printf("Event type = %d\n", header -> type);
       printf("Event size = %d\n", header -> size);
       if (header -> type == PERF_RECORD_SAMPLE) {
-	struct sample *sample = (struct sample *)(metadata_page_charp + page_size + 8);
+	struct sample *sample = (struct sample *)((char *)(header) + 8);
 	printf("Sample details:\n");
 	printf("  Instruction pointer = %" PRIx64 "\n", sample -> ip);
 	printf("  Process id = %u\n", sample -> pid);
