@@ -151,6 +151,8 @@ int main() {
       i++;
     }
 
+    sleep(100);
+
     /* munmap - close */
     if (munmap(metadata_page, length)) {
 	fprintf (stderr, "Couldn't unmmap file descriptor: %s - errno = %d\n",
