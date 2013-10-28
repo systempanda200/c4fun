@@ -30,6 +30,14 @@ struct sample {
     uint32_t cpuid;
 };
 
+char * get_sample_type_name(int type) {
+  switch (type) {
+  case PERF_RECORD_SAMPLE:
+    return "PERF_RECORD_SAMPLE";
+  }
+  return NULL;
+}
+
 int main() {
 
     /* Declarations */
@@ -76,6 +84,10 @@ int main() {
     ioctl(fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
     sleep(0);
+    sleep(0);
+    sleep(0);
+    sleep(0);
+    printf("Yess\n");
     ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
 
     /* Reading result */
@@ -96,7 +108,7 @@ int main() {
     struct perf_event_header *header = (struct perf_event_header *)((char *)metadata_page + page_size);
     int i = 0;
     while (i < 10) {
-      printf("Event type = %d\n", header -> type);
+      printf("Event type = %s\n", get_sample_type_name(header -> type));
       printf("Event size = %d\n", header -> size);
       if (header -> type == PERF_RECORD_SAMPLE) {
 	struct sample *sample = (struct sample *)((char *)(header) + 8);
