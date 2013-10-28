@@ -83,21 +83,30 @@ int main() {
     printf("Metada page compat_version = %d\n", metadata_page -> compat_version);
     printf("Metada page time_enabled = %l" PRIu64 "\n", metadata_page -> time_enabled);
     printf("Metada page time_running = %l" PRIu64 "\n", metadata_page -> time_running);
+
+    /* I THINK: head and tail are used to indicate to the kernel where
+       we are in reading events in order to not override the buffer */
     uint64_t head = metadata_page -> data_head;
     printf("Metada page head = %" PRIx64 "\n", head);
+    uint64_t tail = metadata_page -> data_tail;
+    printf("Metada page tail = %" PRIx64 "\n", tail);
     rmb();
 
+    // we need a char * to have next line pointer arithmetic working on bytes.
     char * metadata_page_charp = (char *) metadata_page;
     struct perf_event_header *header = (struct perf_event_header *)(metadata_page_charp + page_size);
-    printf("First event type = %d\n", header -> type);
-    printf("First event size = %d\n", header -> size);
-    if (header -> type == PERF_RECORD_SAMPLE) {
+    while (1) {
+      printf("Event type = %d\n", header -> type);
+      printf("Event size = %d\n", header -> size);
+      if (header -> type == PERF_RECORD_SAMPLE) {
 	struct sample *sample = (struct sample *)(metadata_page_charp + page_size + 8);
 	printf("Sample details:\n");
 	printf("  Instruction pointer = %" PRIx64 "\n", sample -> ip);
 	printf("  Process id = %u\n", sample -> pid);
 	printf("  Thread id = %u\n", sample -> tid);
 	printf("  Cpu id = %u\n", sample -> cpuid);
+      }
+      header = (struct perf_event_header *)((char *)header + header -> size);
     }
 
     /* munmap - close */
