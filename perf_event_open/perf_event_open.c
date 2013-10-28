@@ -62,6 +62,7 @@ int main() {
     pe.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_CPU;
     pe.precise_ip = 2;
     pe.mmap = 1;
+    pe.task = 1;
     pe.disabled = 1;
     pe.exclude_kernel = 1;
     pe.exclude_hv = 1;
@@ -90,6 +91,13 @@ int main() {
     sleep(0);
     sleep(0);
     sleep(0);
+    int fdCode = open("/home/manu/numa-eval/NuMemP/libnumemp.so", O_RDWR);
+    void *code = mmap(NULL, length, PROT_EXEC, MAP_SHARED, fdCode, 0);
+    if (code == MAP_FAILED) {
+	fprintf (stderr, "Couldn't mmap /home/manu/numa-eval/NuMemP/libnumemp.so: %s - errno = %d\n",
+		 strerror (errno), errno);
+	exit (EXIT_FAILURE);
+    }
     printf("Yess\n");
     ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
 
