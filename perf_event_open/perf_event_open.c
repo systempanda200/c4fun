@@ -124,9 +124,9 @@ int main() {
     /* I THINK: head and tail are used to indicate to the kernel where
        we are in reading events in order to not override the buffer */
     uint64_t head = metadata_page -> data_head;
-    printf("Metada page head = %" PRIx64 "\n", head);
+    printf("Metada page head = %" PRIu64 "\n", head);
     uint64_t tail = metadata_page -> data_tail;
-    printf("Metada page tail = %" PRIx64 "\n", tail);
+    printf("Metada page tail = %" PRIu64 "\n", tail);
     rmb();
 
     // we need a char * to have next line pointer arithmetic working on bytes.
@@ -134,7 +134,7 @@ int main() {
     uint64_t i = 0;
     while (i < head) {
       printf("\nEvent type = %s\n", get_sample_type_name(header -> type));
-      printf("Event size = %d\n", header -> size);
+      printf("Event size = %" PRIu16 "\n", header -> size);
       if (header -> type == PERF_RECORD_SAMPLE) {
 	struct sample *sample = (struct sample *)((char *)(header) + 8);
 	printf("Sample details:\n");
