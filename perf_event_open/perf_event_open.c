@@ -66,14 +66,14 @@ int main() {
     printf("Size of sample = %lu\n", sizeof(struct sample));
     printf("Size of sample header = %lu\n", sizeof(struct perf_event_header));
     printf("Size of uint64_t = %lu\n", sizeof(uint64_t));
-    printf("Size of uint64_t = %lu\n", sizeof(uint32_t));
+    printf("Size of uint32_t = %lu\n", sizeof(uint32_t));
 
     memset(&pe, 0, sizeof(struct perf_event_attr));
     pe.type = PERF_TYPE_HARDWARE;
     pe.size = sizeof(struct perf_event_attr);
     pe.config = PERF_COUNT_HW_INSTRUCTIONS;
     pe.sample_period = 1;
-    pe.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_CPU;
+    pe.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD;
     pe.precise_ip = 2;
     pe.mmap = 1;
     pe.task = 1;
