@@ -11,6 +11,7 @@
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+#include <pthread.h>
 
 #define rmb()		asm volatile("lfence" ::: "memory")
 
