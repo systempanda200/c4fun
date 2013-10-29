@@ -81,7 +81,7 @@ int main() {
     pe.exclude_kernel = 1;
     pe.exclude_hv = 1;
 
-    fd = perf_event_open(&pe, -1, 0, -1, 0);
+    fd = perf_event_open(&pe, 0, 0, -1, 0);
     if (fd == -1) {
       fprintf(stderr, "Error in perf_event_open: %s\n", strerror (errno));
 	exit(EXIT_FAILURE);
