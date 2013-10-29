@@ -96,18 +96,18 @@ int main() {
     printf("Recording samples\n");
     ioctl(fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
-    sleep(0);
-    sleep(0);
-    sleep(0);
-    sleep(0);
-    int fdCode = open("/home/manu/numa-eval/NuMemP/libnumemp.so", O_RDWR);
-    void *code = mmap(NULL, length, PROT_EXEC, MAP_SHARED, fdCode, 0);
-    if (code == MAP_FAILED) {
-	fprintf (stderr, "Couldn't mmap /home/manu/numa-eval/NuMemP/libnumemp.so: %s - errno = %d\n",
-		 strerror (errno), errno);
-	exit (EXIT_FAILURE);
-    }
-    printf("Yess\n");
+    /* sleep(0); */
+    /* sleep(0); */
+    /* sleep(0); */
+    /* sleep(0); */
+    /* int fdCode = open("/home/manu/numa-eval/NuMemP/libnumemp.so", O_RDWR); */
+    /* void *code = mmap(NULL, length, PROT_EXEC, MAP_SHARED, fdCode, 0); */
+    /* if (code == MAP_FAILED) { */
+    /* 	fprintf (stderr, "Couldn't mmap /home/manu/numa-eval/NuMemP/libnumemp.so: %s - errno = %d\n", */
+    /* 		 strerror (errno), errno); */
+    /* 	exit (EXIT_FAILURE); */
+    /* } */
+    /* printf("Yess\n"); */
     ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
 
     /* Reading result */
