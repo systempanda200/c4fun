@@ -92,6 +92,9 @@ int main() {
 	exit (EXIT_FAILURE);
     }
 
+    printf("Size of sample = %lu\n", sizeof(struct sample));
+    printf("Size of sample header = %lu\n", sizeof(struct perf_event_header));
+
     /* Perform recording */
     printf("Recording samples\n");
     ioctl(fd, PERF_EVENT_IOC_RESET, 0);
@@ -127,7 +130,7 @@ int main() {
     // we need a char * to have next line pointer arithmetic working on bytes.
     struct perf_event_header *header = (struct perf_event_header *)((char *)metadata_page + page_size);
     int i = 0;
-    while (i < 30) {
+    while (i < 10) {
       printf("\nEvent type = %s\n", get_sample_type_name(header -> type));
       printf("Event size = %d\n", header -> size);
       if (header -> type == PERF_RECORD_SAMPLE) {
