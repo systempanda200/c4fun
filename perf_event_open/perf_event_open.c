@@ -63,6 +63,11 @@ int main() {
     printf("Process id = %d\n", pid);
     printf("Thread  id = %ld\n", tid);
 
+    printf("Size of sample = %lu\n", sizeof(struct sample));
+    printf("Size of sample header = %lu\n", sizeof(struct perf_event_header));
+    printf("Size of uint64_t = %lu\n", sizeof(uint64_t));
+    printf("Size of uint64_t = %lu\n", sizeof(uint32_t));
+
     memset(&pe, 0, sizeof(struct perf_event_attr));
     pe.type = PERF_TYPE_HARDWARE;
     pe.size = sizeof(struct perf_event_attr);
@@ -91,10 +96,6 @@ int main() {
 		 strerror (errno), errno);
 	exit (EXIT_FAILURE);
     }
-
-    printf("Size of sample = %lu\n", sizeof(struct sample));
-    printf("Size of sample header = %lu\n", sizeof(struct perf_event_header));
-    printf("Size of uint64_t = %lu\n", sizeof(uint64_t));
 
     /* Perform recording */
     printf("Recording samples\n");
