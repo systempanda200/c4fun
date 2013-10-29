@@ -154,7 +154,7 @@ int main() {
       }
       header = (struct perf_event_header *)((char *)header + header -> size);
       i = i + header -> size;
-      printf("i = %lu < head = %lu ? %s\n", i, head, ((i < head) ? "true" : "false"));
+      printf("i = %" PRIu64 " < head = %" PRIu64 "? %s\n", i, head, ((i < head) ? "true" : "false"));
     }
 
     // sleep(100);
