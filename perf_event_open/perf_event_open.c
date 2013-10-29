@@ -131,7 +131,7 @@ int main() {
 
     // we need a char * to have next line pointer arithmetic working on bytes.
     struct perf_event_header *header = (struct perf_event_header *)((char *)metadata_page + page_size);
-    int i = 0;
+    uint64_t i = 0;
     while (i < head) {
       printf("\nEvent type = %s\n", get_sample_type_name(header -> type));
       printf("Event size = %d\n", header -> size);
@@ -154,7 +154,7 @@ int main() {
       }
       header = (struct perf_event_header *)((char *)header + header -> size);
       i = i + header -> size;
-      printf("i = %d\n", i);
+      printf("i = %lu\n < head = %lu ? %s", i, head, ((i < head) ? "true" : "false"));
     }
 
     // sleep(100);
