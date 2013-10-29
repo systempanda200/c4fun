@@ -94,6 +94,7 @@ int main() {
 
     printf("Size of sample = %lu\n", sizeof(struct sample));
     printf("Size of sample header = %lu\n", sizeof(struct perf_event_header));
+    printf("Size of uint64_t = %lu\n", sizeof(uint64_t));
 
     /* Perform recording */
     printf("Recording samples\n");
