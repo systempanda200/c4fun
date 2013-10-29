@@ -67,7 +67,7 @@ int main() {
     pe.type = PERF_TYPE_HARDWARE;
     pe.size = sizeof(struct perf_event_attr);
     pe.config = PERF_COUNT_HW_INSTRUCTIONS;
-    pe.sample_period = 100;
+    pe.sample_period = 1;
     pe.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_CPU;
     pe.precise_ip = 2;
     pe.mmap = 1;
@@ -151,7 +151,7 @@ int main() {
       i++;
     }
 
-    sleep(100);
+    // sleep(100);
 
     /* munmap - close */
     if (munmap(metadata_page, length)) {
