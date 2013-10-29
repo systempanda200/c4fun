@@ -154,6 +154,7 @@ int main() {
       }
       header = (struct perf_event_header *)((char *)header + header -> size);
       i = i + header -> size;
+      printf("i = %d\n", i);
     }
 
     // sleep(100);
