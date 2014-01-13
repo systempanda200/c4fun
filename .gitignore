@@ -61,6 +61,9 @@
 *.snm
 auto
 
+# perf generated files
+perf.data*
+
 # Files specific to this project
 numa-expe
 cpuid

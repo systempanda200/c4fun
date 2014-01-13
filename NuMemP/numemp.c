@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <linux/perf_event.h>
+#include <perfmon/pfmlib_perf_event.h>
 #include <asm/unistd.h>
 #include <sys/mman.h>
 #include <errno.h>
@@ -11,7 +12,6 @@
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
-#include <perfmon/pfmlib_perf_event.h>
 #include <err.h>
 #include <numa.h>
 
@@ -23,6 +23,8 @@ int pfm_encoding_res;
 int numa_node_to_cpu[MAX_NB_NUMA_NODES];
 
 __attribute__((constructor)) void init(void) {
+
+  printf("init lib\n");
 
   // Get numa configuration
   int available = numa_available();

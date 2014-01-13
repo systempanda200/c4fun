@@ -5,10 +5,11 @@ all: example_dynamic
 
 dynamic: numemp.c numemp.h
 	gcc $(CFLAGS) -fpic -c numemp.c
-	gcc -shared -o libnumemp.so numemp.o -lpfm -lnuma
+	gcc -shared -o libnumemp.so numemp.o -lnuma -lpfm
 
 example_dynamic: dynamic example.c
-	gcc $(CFLAGS) -o example example.c -L. -lnumemp
+	gcc $(CFLAGS) -c example.c
+	gcc $(CFLAGS) -o example example.o -L. -lnumemp
 
 clean:
 	rm -f *.o *.a *.so* example

@@ -6,7 +6,7 @@ int main() {
   struct numemp_measure m;
   int res = numemp_start(&m);
   if(res < 0) {
-    printf("Error : %s\n", numemp_error_message(res));
+    printf("numemp_start error : %s\n", numemp_error_message(res));
     return -1;
   }
   sleep(5);
