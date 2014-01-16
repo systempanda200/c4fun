@@ -7,20 +7,49 @@
 #include <numa.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <errno.h>
+#include <err.h>
+#include <sys/mman.h>
 
-// For perf
-#include <linux/perf_event.h>
+#include <perfmon/pfmlib_perf_event.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
 
-long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-                int cpu, int group_fd, unsigned long flags) {
-    int ret = syscall(__NR_perf_event_open, hw_event, pid, cpu,
-                   group_fd, flags);
-    return ret;
+#define ELEM_TYPE uint64_t
+
+#define rmb() asm volatile("lfence" ::: "memory")
+
+int is_served_by_memory(union perf_mem_data_src data_src) {         
+  if (data_src.mem_lvl & PERF_MEM_LVL_MISS) {                                                                                                                                  
+    if (data_src.mem_lvl & PERF_MEM_LVL_L3) {                    
+      return 1;
+    } else {
+      return 0;
+    }
+  } else if (data_src.mem_lvl & PERF_MEM_LVL_HIT) {
+    if (data_src.mem_lvl & PERF_MEM_LVL_LOC_RAM) {
+      return 1; 
+    } else if (data_src.mem_lvl & PERF_MEM_LVL_REM_RAM1) {
+      return 1; 
+    } else if (data_src.mem_lvl & PERF_MEM_LVL_REM_RAM2) {
+      return 1; 
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
 }
 
-#define ELEM_TYPE uint64_t
+/**
+ * Structure representing a sample gathered with the library in sampling mode.
+ */
+struct sample {                                                                                                                                                                      uint64_t ip;
+  uint64_t addr;
+  uint64_t weight;
+  union perf_mem_data_src data_src;
+};
+
 
 /**
  * Structure used along with the following compare method to shuffle
@@ -194,47 +223,107 @@ int main(int argc, char **argv) {
    * Profile memory reading
    */
 
-  // Set attribute parameter for perf_event_open
+  // Manualy set and open memory counting event
   struct perf_event_attr pe_attr;
   memset(&pe_attr, 0, sizeof(pe_attr));
   pe_attr.size = sizeof(pe_attr);
-  pe_attr.type = 6;
-  pe_attr.config = 0x072C;
-  pe_attr.type = PERF_TYPE_HARDWARE;
-  pe_attr.config = PERF_COUNT_HW_INSTRUCTIONS;
+  pe_attr.type = 6; // /sys/bus/event_source/uncore/type
+  pe_attr.config = 0x072c; // QMC_NORMAL_READS.ANY
   pe_attr.disabled = 1;
-  pe_attr.exclude_kernel = 1;
-  pe_attr.exclude_hv = 1;
-
-  // Open the events with Linux system call
-  printf("%d, %llu, %u\n", pe_attr.size, pe_attr.config,  pe_attr.type);
-  int fd = perf_event_open(&pe_attr, -1, 2, -1, 0);
-  if (fd == -1) {
-    printf("perf_event_open_failed\n");
+  int memory_reads_fd = perf_event_open(&pe_attr, -1, 9, -1, 0);
+  if (memory_reads_fd == -1) {
+    printf("perf_event_open_failed: %s\n", strerror(errno));
     return -1;
   }
+
+  // Manualy set and open memory sampling event
+  struct perf_event_attr pe_attr_sampling;
+  memset(&pe_attr_sampling, 0, sizeof(pe_attr_sampling));
+  pe_attr_sampling.size = sizeof(pe_attr_sampling);
+  pe_attr_sampling.type = PERF_TYPE_RAW;
+  pe_attr_sampling.config = 0x0100b; //
+  pe_attr_sampling.disabled = 1;
+  pe_attr_sampling.config1 = 3; // latency threshold
+  pe_attr_sampling.sample_period = 2000;
+  pe_attr_sampling.precise_ip = 2;
+  pe_attr_sampling.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_ADDR | PERF_SAMPLE_WEIGHT | PERF_SAMPLE_DATA_SRC;
+  int memory_sampling_fd = perf_event_open(&pe_attr_sampling, 0, 9, -1, 0);
+  if (memory_sampling_fd == -1) {
+    printf("perf_event_open_failed: %s\n", strerror(errno));
+    return -1;
+  }
+  long page_size = sysconf(_SC_PAGESIZE);
+  size_t mmap_len = page_size + page_size * 1024;
+  struct perf_event_mmap_page *metadata_page = mmap(NULL, mmap_len, PROT_WRITE, MAP_SHARED, memory_sampling_fd, 0);
+  if (metadata_page == MAP_FAILED) {
+    fprintf (stderr, "Couldn't mmap file descriptor: %s - errno = %d\n",
+	     strerror (errno), errno);
+    return -1;
+  }   
+  
+  // Use libpfm to set attribute parameter for perf_event_open                                                                                                 
+  /* pfm_perf_encode_arg_t pfm_arg; */
+  /* struct perf_event_attr pe_attr_pfm; */
+  /* memset(&pe_attr_pfm, 0, sizeof(pe_attr_pfm)); */
+  /* memset(&pfm_arg, 0, sizeof(pfm_arg)); */
+  /* pfm_arg.size = sizeof(pfm_arg); */
+  /* pfm_arg.attr = &pe_attr_pfm; */
+  /* char *str = "holds event string after call to pfm_get_os_event_encoding"; */
+  /* pfm_arg.fstr = &str; */
+  /* pfm_initialize(); */
+  /* int pfm_encoding_res = pfm_get_os_event_encoding("UNC_QMC_NORMAL_READS", PFM_PLM0, PFM_OS_PERF_EVENT, &pfm_arg); */
+  /* if (pfm_encoding_res != PFM_SUCCESS) { */
+  /*   printf("pfm_get_os_event_encoding failed: %s\n", pfm_strerror(pfm_encoding_res)); */
+  /*   return -1; */
+  /* } */
+  /* pe_attr_pfm.size = sizeof(struct perf_event_attr); */
+  /* printf("config = %" PRIu64 ", config1 = %" PRIu64 ", config2 = %" PRIu64 ", type = %u, disabled = %d, inherit = %d, pinned = %d, exclusive = %d, exclude_user = %d, exclude_kernel = %d, exclude_hv = %d, exclude_idle = %d \n", pe_attr_pfm.config, pe_attr_pfm.config1, pe_attr_pfm.config2, pe_attr_pfm.type, pe_attr_pfm.disabled, pe_attr_pfm.inherit, pe_attr_pfm.pinned, pe_attr_pfm.exclusive, pe_attr_pfm.exclude_user, pe_attr_pfm.exclude_kernel, pe_attr_pfm.exclude_hv, pe_attr_pfm.exclude_idle); */
 
   // Starts measuring
   struct timeval t1, t2;
   double elapsedTime;
   gettimeofday(&t1, NULL);
-  ioctl(fd, PERF_EVENT_IOC_RESET, 0);
-  ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+  ioctl(memory_reads_fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(memory_reads_fd, PERF_EVENT_IOC_ENABLE, 0);
+  ioctl(memory_sampling_fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(memory_sampling_fd, PERF_EVENT_IOC_ENABLE, 0);
 
   // Access memory
   read_memory(memory, size);
 
-  // Stop measuring and print results
-  int64_t count;
-  ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
-  read(fd, &count, sizeof(count));
+  // Stop measuring
+  ioctl(memory_reads_fd, PERF_EVENT_IOC_DISABLE, 0);
+  ioctl(memory_sampling_fd, PERF_EVENT_IOC_DISABLE, 0);
+  
+  // Print results
+  int64_t memory_reads_count;
+  read(memory_reads_fd, &memory_reads_count, sizeof(memory_reads_count));
   gettimeofday(&t2, NULL);
   elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
   elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;
   printf("time = %.3f ms\n", elapsedTime);
-  printf("memory reads = %" PRId64 "\n", count);
+  printf("memory reads count = %" PRId64 "\n", memory_reads_count);
+  uint64_t head = metadata_page->data_head;
+  rmb();
+  struct perf_event_header *header = (struct perf_event_header *)((char *)metadata_page + page_size);
+  uint64_t i = 0;
+  int memory_count = 0;
+  int total_count = 0;
+  while (i < head) {
+    if (header -> type == PERF_RECORD_SAMPLE) {
+      struct sample *sample = (struct sample *)((char *)(header) + 8);
+      if (is_served_by_memory(sample->data_src)) {
+	memory_count++;
+      }
+      total_count++;
+    }
+    i = i + header -> size;
+    header = (struct perf_event_header *)((char *)header + header -> size);
+  }
+  printf("%d memory samples on %d samples\n", memory_count, total_count);  
 
-  close(fd);
+  close(memory_reads_fd);
+  close(memory_sampling_fd);
   free(memory);
   return 0;
 }

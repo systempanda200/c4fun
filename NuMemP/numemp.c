@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <linux/perf_event.h>
+//#include <linux/perf_event.h>
 #include <perfmon/pfmlib_perf_event.h>
 #include <asm/unistd.h>
 #include <sys/mman.h>
@@ -88,7 +88,6 @@ int numemp_start(struct numemp_measure *measure) {
   pfm_perf_encode_arg_t arg;
   struct perf_event_attr attr;
   memset(&attr, 0, sizeof(struct perf_event_attr));
-
   memset(&arg, 0, sizeof(arg));
   arg.size = sizeof(pfm_perf_encode_arg_t);
   arg.attr = &attr;
