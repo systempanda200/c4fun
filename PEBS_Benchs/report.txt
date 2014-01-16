@@ -1,0 +1,54 @@
+* Test with perf
+
+** Configuration
+   - One application randomly iterating in a malloced array of integer
+   - The number  of integers in the  array varies in [10  000 000, 100
+     000 000, 500 000 000, 1 000 000 000]
+   - On bull's Machine
+   - Application pinned to a core
+   - perf command to display : "perf mem rep --stdio --sort=mem"
+     + Memory accesses samples  = Local RAM Hit + Remote  RAM hit + L3
+       miss
+   - perf command to collect : "perf mem rec taskset -c 7 application"
+   - cachegrind  command :  "taskset -c  7 valgrind  --tool=cachegrind
+     ./mem_bound"
+     + Total number of memory accesses = D refs + I Refs
+     + Memory access not in cache = LL misses
+
+** Results
+   - 10 000 000
+     + Perf
+       - Total number of samples = 2420
+       - Memory accesses samples = 0 + 0 + 2 = 2 (0.08%)
+       - Memory accesses samples with remote cache = 0 + 0 + 2 + 30 = 32 (1.32%)
+     + Cachegrind
+       - Total number of memory accesses = 1 479 922 211
+       - Memory accesses not in cache = 6 893 294 (0.46%)
+     + Time = 0.6"
+   - 100 000 000
+     + Perf
+       - Total number of samples = 27 600
+       - Memory accesses = 0 + 0 + 8 = 8 (0.03%)
+       - Memory accesses samples with remote cache = 0 + 0 + 8 + 591 = 599 (2%)
+     + Cachegrind
+       - Total number of memory accesses = 14 797 019 359
+       - Memory accesses not in cache =  96 859 927 (0.65%)
+     + Time = 7.12"
+   - 500 000 000
+     +  Perf
+       - Total number of samples = 148 769
+       - Memory accesses = 1 + 0 + 23 = 24 (0.02%)
+     + Time = 37.49"
+   - 1 000 000 000
+     + Perf
+       - Total number of samples = 355 067
+       - Memory accesses = 3 + 1 + 58 = 62 (0.02%)
+     + Time = 91"
+
+* Misc
+
+** Memory typycal latencies
+   + Register 250ps
+   + Cache 1ns
+   + RAM 100ns
+   + Disk 10ms

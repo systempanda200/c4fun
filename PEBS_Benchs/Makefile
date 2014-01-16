@@ -30,4 +30,4 @@ mem_bound_infinite: mem_bound_infinite.c
 # Nettoyage:
 #
 clean:
-	rm -f *.o *~ core mem_bound mem_bound_infinite
+	rm -f *.o cachegrind.out.* perf.data* *~ core mem_bound mem_bound_infinite
