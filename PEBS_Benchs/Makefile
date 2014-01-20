@@ -1,17 +1,17 @@
 #
 # Flags d'erreurs:
 #
-ERROR_FLAGS = -std=gnu99 -Wall -Werror -pedantic -O0
+ERROR_FLAGS = -std=gnu99 -Wall -Werror -O0
 
 #
 # Flags pour le compilateur:
 #
-CFLAGS = $(ERROR_FLAGS) -D_REENTRANT -DLinux -D_GNU_SOURCE
+CFLAGS = $(ERROR_FLAGS)
 
 #
 # Flags pour l'editeur de liens:
 #
-LDFLAGS = $(ERROR_FLAGS) -lpthread -lnuma -lpfm
+LDFLAGS = $(ERROR_FLAGS) -lnuma
 
 #
 # Construction des programmes:
