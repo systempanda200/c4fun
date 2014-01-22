@@ -1,0 +1,60 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage{tikz}
+\usepackage{numprint}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{pgfplots}
+\usepackage{subcaption}
+\usepackage{filecontents}
+\usepackage{pdflscape}
+
+\begin{document}
+
+Our bench is the following :
+\begin{itemize}
+\item Memory loads sampling done with \texttt{perf\_event\_open}.
+\item  Sampling  started  just  before and  ended  jsut  after  memory
+  accesses loop.
+\item  Memory  accesses  loop   variable  and  memory  accesses  stack
+  variables are  register allocated  to have exactly  X loads  in each
+  loop iterration where X is the loop unrolling factor.
+\item According  to the Intel doc,  sampling done only for  loads with
+  latency greater  than or equal to  4 clock cycles. Because  L1 cache
+  hit loads  latency maybe lower  than these  4 cycles, the  number of
+  samples is low compared to the total number of loads. Is this really
+  true    ?      I    would     have    expected     $nb\_samples    =
+  \frac{nb\_loads}{frequency}$ but it's not the case.
+\end{itemize}
+
+\begin{filecontents}{seq.dat}
+seq_data
+\end{filecontents}
+
+\begin{figure}[h]
+  \begin{tikzpicture}
+    \begin{axis}[legend pos=north west,ymin=0,ymax=100,xtick=data,xlabel={memory size (MB)},ylabel={\% of memory samples}]
+seq_plot
+seq_legend
+    \end{axis}
+  \end{tikzpicture}
+  \caption{percentage of memory samples for different memory size in the sequential
+    accesses case with prefetching enabled.}
+\end{figure}
+
+\begin{filecontents}{rand.dat}
+rand_data
+\end{filecontents}
+
+\begin{figure}[h]
+  \begin{tikzpicture}
+    \begin{axis}[legend pos=north west,ymin=0,ymax=100,xtick=data,xlabel={memory size (MB)},ylabel={\% of memory samples}]
+rand_plot
+rand_legend
+    \end{axis}
+  \end{tikzpicture}
+  \caption{percentage of memory samples for different memory size in the random
+    accesses case with prefetching enabled.}
+\end{figure}
+
+\end{document}

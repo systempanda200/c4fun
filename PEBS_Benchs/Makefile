@@ -1,12 +1,12 @@
 #
 # Flags d'erreurs:
 #
-ERROR_FLAGS = -std=gnu99 -Wall -Werror -O0
+ERROR_FLAGS = -std=gnu99 -Wall -Werror -O0 -g
 
 #
 # Flags pour le compilateur:
 #
-CFLAGS = $(ERROR_FLAGS)
+CFLAGS = $(ERROR_FLAGS) -D_GNU_SOURCE
 
 #
 # Flags pour l'editeur de liens:
@@ -16,18 +16,17 @@ LDFLAGS = $(ERROR_FLAGS) -lnuma
 #
 # Construction des programmes:
 #
-all: clean mem_bound mem_bound_infinite
+all: clean pebs_bench
 
-mem_bound: mem_bound.c
-	gcc $(CFLAGS) -c mem_bound.c
-	gcc -o mem_bound mem_bound.o $(LDFLAGS)
+pebs_bench: pebs_bench_ui pebs_bench.c
+	gcc $(CFLAGS) -c pebs_bench.c
+	gcc -o pebs_bench pebs_bench.o pebs_bench_ui.o $(LDFLAGS)
 
-mem_bound_infinite: mem_bound_infinite.c
-	gcc $(CFLAGS) -c mem_bound_infinite.c
-	gcc -o mem_bound_infinite mem_bound_infinite.o $(LDFLAGS)
+pebs_bench_ui: pebs_bench_ui.c
+	gcc $(CFLAGS) -c pebs_bench_ui.c
 
 #
 # Nettoyage:
 #
 clean:
-	rm -f *.o cachegrind.out.* perf.data* *~ core mem_bound mem_bound_infinite
+	rm -f *.o cachegrind.out.* perf.data* *~ core mem_bound mem_bound_infinite out
