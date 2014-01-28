@@ -10,7 +10,7 @@
 #include <err.h>
 #include <sys/mman.h>
 
-// For affinity
+// For thread affinity
 #include <sched.h>
 
 #include <sys/ioctl.h>
@@ -18,31 +18,17 @@
 #include "pebs_bench.h"
 #include "pebs_bench_ui.h"
 
-#define CPU 3
+#define CPU 8
 #define NUMA_NODE 0
 #define NUMA_ALLOC 1 // Set to one to use numa_alloc
 
 #define ELEM_TYPE uint64_t
 
+
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {
     int ret = syscall(__NR_perf_event_open, hw_event, pid, cpu,
                    group_fd, flags);
     return ret;
-}
-
-/**
- * Structure used along with the following compare method to shuffle
- * an array of N elements.
- */
-struct rand_struct {
-  int index;
-  int rand;
-};
-
-static int compar(const void* a1, const void* a2) {
-  struct rand_struct *a = (struct rand_struct*) a1;
-  struct rand_struct *b = (struct rand_struct*) a2;
-  return a->rand - b->rand;
 }
 
 /**
@@ -56,6 +42,22 @@ void fill_memory_sequential(size_t size, uint64_t* memory, size_t nb_elems) {
     memory[i] = (uint64_t)&memory[i + 1];
   }
   memory[i] = (uint64_t)&memory[0];
+}
+
+
+/**
+ * Structure used along with the following compar function to shuffle
+ * an array of N elements.
+ */
+struct rand_struct {
+  int index;
+  int rand;
+};
+
+static int compar(const void* a1, const void* a2) {
+  struct rand_struct *a = (struct rand_struct*) a1;
+  struct rand_struct *b = (struct rand_struct*) a2;
+  return a->rand - b->rand;
 }
 
 /**
@@ -146,7 +148,7 @@ void read_memory(uint64_t *memory, size_t size) {
     addr = (uint64_t *)*addr;
     addr = (uint64_t *)*addr;
 
-    nb_elem_remaining -= 64;
+    nb_elem_remaining -= 32;
   }
 }
 
@@ -155,33 +157,11 @@ enum access_mode_t {
   access_random
 };
 
-void usage(const char *prog_name) {
-  printf ("Usage %s size access_mode period\n\tsize is the size of the allocated and accessed memory in mega bytes\n\taccess_mode is either seq for sequential accesses or rand for random accesses\n\tperiod the sampling period in number of events\n", prog_name);
-}
 
-int main(int argc, char **argv) {
+int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t period) {
 
-  /**
-   * Check and get arguments.
-   */
-  if (argc <= 3) {
-    usage(argv[0]);
-    return -1;
-  }
-  size_t size_in_bytes = atol(argv[1]) * 1000000;
   int nb_elems = size_in_bytes / sizeof(ELEM_TYPE);
-  enum access_mode_t access_mode;
-  if (!strcmp(argv[2], "seq")) {
-    access_mode = access_seq;
-  } else if (!strcmp(argv[2], "rand")) {
-    access_mode = access_random;
-  } else {
-    printf("Unknown access_mode %s\n", argv[2]);
-    usage(argv[0]);
-    return -1;
-  }
-  uint64_t period = atol(argv[3]);
-  printf("Accessing %lu mega bytes in %d accesses of size %ld bytes\n", (size_in_bytes / 1000000), nb_elems, sizeof(ELEM_TYPE));
+  printf("Accessing %lu mega bytes in %d %ld bytes accesses\n", (size_in_bytes / 1000000), nb_elems, sizeof(ELEM_TYPE));
 
   /**
    * Pin process on core CPU
@@ -207,13 +187,13 @@ int main(int argc, char **argv) {
     memory = malloc(size_in_bytes);
   }
   assert(memory);
-  memset(memory, 0, size_in_bytes);
+  memset(memory, -1, size_in_bytes);
   if (access_mode == access_seq) {
     fill_memory_sequential(size_in_bytes, memory, nb_elems);
   } else {
     fill_memory_rand(size_in_bytes, memory, nb_elems);
   }
-  mlockall(MCL_CURRENT | MCL_FUTURE);
+  mlockall(MCL_CURRENT | MCL_FUTURE); // Ensure pages are not swapped
 
   /**
    * Profile memory and other things
@@ -231,18 +211,18 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  // Manualy set and open ram memory counting event
-  /* struct perf_event_attr pe_attr_unc_memory; */
-  /* memset(&pe_attr_unc_memory, 0, sizeof(pe_attr_unc_memory)); */
-  /* pe_attr_unc_memory.size = sizeof(pe_attr_unc_memory); */
-  /* pe_attr_unc_memory.type = 6; // /sys/bus/event_source/uncore/type */
-  /* pe_attr_unc_memory.config = 0x072c; // QMC_NORMAL_READS.ANY */
-  /* pe_attr_unc_memory.disabled = 1; */
-  /* int memory_reads_fd = perf_event_open(&pe_attr_unc_memory, -1, CPU, -1, 0); */
-  /* if (memory_reads_fd == -1) { */
-  /*   printf("perf_event_open failed for uncore memory: %s\n", strerror(errno)); */
-  /*   return -1; */
-  /* } */
+  // Manualy set and open 64 bytes cache line reads from memory counting event
+  struct perf_event_attr pe_attr_unc_memory;
+  memset(&pe_attr_unc_memory, 0, sizeof(pe_attr_unc_memory));
+  pe_attr_unc_memory.size = sizeof(pe_attr_unc_memory);
+  pe_attr_unc_memory.type = 6; // /sys/bus/event_source/uncore/type
+  pe_attr_unc_memory.config = 0x072c; // QMC_NORMAL_READS.ANY
+  pe_attr_unc_memory.disabled = 1;
+  int memory_reads_fd = perf_event_open(&pe_attr_unc_memory, -1, numa_node_of_cpu(CPU), -1, 0);
+  if (memory_reads_fd == -1) {
+    printf("perf_event_open failed for uncore memory: %s\n", strerror(errno));
+    return -1;
+  }
 
   // Manualy set and open load retired counting event
   struct perf_event_attr pe_attr_loads;
@@ -252,6 +232,7 @@ int main(int argc, char **argv) {
   pe_attr_loads.config = 0x010b; // MEM_INST_RETIRED.LOADS
   pe_attr_loads.disabled = 1;
   pe_attr_loads.exclude_kernel = 1;
+  pe_attr_loads.exclude_hv = 1;
   int loads_fd = perf_event_open(&pe_attr_loads, 0, CPU, -1, 0);
   if (loads_fd == -1) {
     printf("perf_event_open failed for core loads: %s\n", strerror(errno));
@@ -285,26 +266,26 @@ int main(int argc, char **argv) {
   pe_attr_sampling.precise_ip = 2;
   pe_attr_sampling.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_ADDR | PERF_SAMPLE_WEIGHT | PERF_SAMPLE_DATA_SRC;
   pe_attr_sampling.exclude_kernel = 1;
-  int memory_sampling_fd = NULL;/* perf_event_open(&pe_attr_sampling, 0, CPU, -1, 0); */
-  /* if (memory_sampling_fd == -1) { */
-  /*   printf("perf_event_open failed for sampling: %s\n", strerror(errno)); */
-  /*   return -1; */
-  /* } */
-  /* long page_size = sysconf(_SC_PAGESIZE); */
-  /* size_t mmap_len = page_size + page_size * 1024; */
-  struct perf_event_mmap_page *metadata_page = NULL; /* = mmap(NULL, mmap_len, PROT_WRITE, MAP_SHARED, memory_sampling_fd, 0); */
-  /* if (metadata_page == MAP_FAILED) { */
-  /*   fprintf (stderr, "Couldn't mmap file descriptor: %s - errno = %d\n", */
-  /* 	     strerror (errno), errno); */
-  /*   return -1; */
-  /* } */
+  int memory_sampling_fd = perf_event_open(&pe_attr_sampling, 0, CPU, -1, 0);
+  if (memory_sampling_fd == -1) {
+    printf("perf_event_open failed for sampling: %s\n", strerror(errno));
+    return -1;
+  }
+  long page_size = sysconf(_SC_PAGESIZE);
+  size_t mmap_len = page_size + page_size * 1024;
+  struct perf_event_mmap_page *metadata_page = mmap(NULL, mmap_len, PROT_WRITE, MAP_SHARED, memory_sampling_fd, 0);
+  if (metadata_page == MAP_FAILED) {
+    fprintf (stderr, "Couldn't mmap file descriptor: %s - errno = %d\n",
+  	     strerror (errno), errno);
+    return -1;
+  }
 
   // Starts measuring
   struct timeval t1, t2;
   double elapsedTime;
   gettimeofday(&t1, NULL);
-  /* ioctl(memory_reads_fd, PERF_EVENT_IOC_RESET, 0); */
-  /* ioctl(memory_reads_fd, PERF_EVENT_IOC_ENABLE, 0); */
+  ioctl(memory_reads_fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(memory_reads_fd, PERF_EVENT_IOC_ENABLE, 0);
   ioctl(loads_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(loads_fd, PERF_EVENT_IOC_ENABLE, 0);
   ioctl(inst_fd, PERF_EVENT_IOC_RESET, 0);
@@ -323,14 +304,14 @@ int main(int argc, char **argv) {
   ioctl(page_faults_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(inst_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(loads_fd, PERF_EVENT_IOC_DISABLE, 0);
-  /* ioctl(memory_reads_fd, PERF_EVENT_IOC_DISABLE, 0); */
+  ioctl(memory_reads_fd, PERF_EVENT_IOC_DISABLE, 0);
 
   // Print results
-  //uint64_t memory_reads_count;
+  uint64_t memory_reads_count;
   uint64_t loads_count;
   uint64_t insts_count;
   uint64_t page_faults_count;
-  //read(memory_reads_fd, &memory_reads_count, sizeof(memory_reads_count));
+  read(memory_reads_fd, &memory_reads_count, sizeof(memory_reads_count));
   read(loads_fd, &loads_count, sizeof(loads_count));
   read(inst_fd, &insts_count, sizeof(insts_count));
   read(page_faults_fd, &page_faults_count, sizeof(page_faults_count));
@@ -338,12 +319,16 @@ int main(int argc, char **argv) {
   elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
   elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;
   printf("\n");
-  printf("%-60s = %15" PRIu64 "\n", "Page faults count", page_faults_count);
-  printf("%-60s = %15.3f \n",       "time               (               milliseconds         )", elapsedTime);
-  //printf("%-60s = %15" PRId64 "\n", "ram reads count    (uncore event: QMC_NORMAL_READS.ANY  )", memory_reads_count);
-  printf("%-60s = %15" PRId64 "\n", "instructions count (  core event: INST_RETIRED.ANY      )", insts_count);
-  printf("%-60s = %15" PRId64 "\n", "loads count        (  core event: MEM_INST_RETIRED.LOADS)", loads_count);
-  print_samples(metadata_page, ADDR, (uint64_t)memory, (uint64_t)memory + size_in_bytes);
+  printf("%-80s = %15" PRIu64 "\n", "Page faults count", page_faults_count);
+  printf("%-80s = %15.3f \n",       "time (milliseconds)", elapsedTime);
+  printf("%-80s = %15" PRId64 " (expected = %" PRId64 ")\n", "64 bytes cache line reads from RAM count (uncore event: QMC_NORMAL_READS.ANY)", memory_reads_count, (size_in_bytes / 64));
+  printf("%-80s = %15" PRId64 "\n", "instructions count (core event: INST_RETIRED.ANY)", insts_count);
+  printf("%-80s = %15" PRId64 " (expected = %d)\n", "loads count (core event: MEM_INST_RETIRED.LOADS)", loads_count, nb_elems);
+  if (metadata_page->data_head > mmap_len) {
+    printf("more samples than space in mmap allocated ring buffer\n");
+    return -1;
+  }
+  print_samples(metadata_page, ADDR, (uint64_t)memory, (uint64_t)memory + size_in_bytes, nb_elems / period);
   //close(memory_reads_fd);
   close(memory_sampling_fd);
   if (numa_available() == -1 && NUMA_ALLOC) {
@@ -352,4 +337,32 @@ int main(int argc, char **argv) {
     numa_free(memory, size_in_bytes);
   }
   return 0;
+}
+
+void usage(const char *prog_name) {
+  printf ("Usage %s size access_mode period\n\trun benchmarks where:\n\t\tsize is the size of the allocated and accessed memory in mega bytes\n\t\taccess_mode is either seq for sequential accesses or rand for random accesses\n\t\tperiod the sampling period in number of events\n", prog_name);
+}
+
+int main(int argc, char **argv) {
+
+  /**
+   * Check and get arguments.
+   */
+  if (argc <= 3) {
+    usage(argv[0]);
+    return -1;
+  }
+  size_t size_in_bytes = atol(argv[1]) * 1000000;
+  enum access_mode_t access_mode;
+  if (!strcmp(argv[2], "seq")) {
+    access_mode = access_seq;
+  } else if (!strcmp(argv[2], "rand")) {
+    access_mode = access_random;
+  } else {
+    printf("Unknown access_mode %s\n", argv[2]);
+    usage(argv[0]);
+    return -1;
+  }
+  uint64_t period = atol(argv[3]);
+  return run_benchs(size_in_bytes, access_mode, period);
 }

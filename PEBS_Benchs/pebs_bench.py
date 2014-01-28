@@ -5,9 +5,9 @@ import shutil
 import subprocess
 
 FREQS = [10000, 5000, 4000, 2000, 1000, 500, 100]
-FREQS = [10000, 5000, 4000]
-MEM_SIZES = [4, 12, 16, 32, 64, 128, 256, 512]
-MEM_SIZES = [4, 12, 16, 32]
+#FREQS = [10000]
+MEM_SIZES = [2, 4, 8, 16, 32, 64, 128, 256]
+#MEM_SIZES = [2, 4, 8, 16, 32]
 
 MODE_SEQ = 'seq'
 MODE_RAND = 'rand'
@@ -37,7 +37,7 @@ for size in MEM_SIZES:
              for line in out.split('\n'):
                  if line.find('memory samples on') != -1:
                      splits = line.split(' ')
-                     run = Bench_Run(size, freq, mode, long(splits[0]), long(splits[4]))
+                     run = Bench_Run(size, freq, mode, long(splits[4]), long(splits[0]))
                      runs.append(run)
                      break
 

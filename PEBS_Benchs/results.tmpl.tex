@@ -33,10 +33,17 @@ seq_data
 
 \begin{figure}[h]
   \begin{tikzpicture}
-    \begin{axis}[legend pos=north west,ymin=0,ymax=100,xtick=data,xlabel={memory size (MB)},ylabel={\% of memory samples}]
+    \pgfplotsset{
+      log basis x={2},
+      x tick label style={/pgf/number format/1000 sep=\,},
+      log base 10 number format code/.code={
+        $\pgfmathparse{10^(#1)}\pgfmathprintnumber{\pgfmathresult}$
+      }
+    }
+    \begin{semilogxaxis}[legend pos=north west,ymin=0,ymax=100, ,xlabel={memory size (MB)},ylabel={\% of memory samples}]
 seq_plot
 seq_legend
-    \end{axis}
+    \end{semilogxaxis}
   \end{tikzpicture}
   \caption{percentage of memory samples for different memory size in the sequential
     accesses case with prefetching enabled.}
@@ -48,10 +55,17 @@ rand_data
 
 \begin{figure}[h]
   \begin{tikzpicture}
-    \begin{axis}[legend pos=north west,ymin=0,ymax=100,xtick=data,xlabel={memory size (MB)},ylabel={\% of memory samples}]
+    \pgfplotsset{
+      log basis x={2},
+      x tick label style={/pgf/number format/1000 sep=\,},
+      log base 10 number format code/.code={
+        $\pgfmathparse{10^(#1)}\pgfmathprintnumber{\pgfmathresult}$
+      }
+    }
+    \begin{semilogxaxis}[legend pos=north west,ymin=0,ymax=100,xlabel={memory size (MB)},ylabel={\% of memory samples}]
 rand_plot
 rand_legend
-    \end{axis}
+    \end{semilogxaxis}
   \end{tikzpicture}
   \caption{percentage of memory samples for different memory size in the random
     accesses case with prefetching enabled.}

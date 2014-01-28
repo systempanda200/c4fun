@@ -12,6 +12,7 @@ typedef enum {
 }
 display_order;
 
-void print_samples(struct perf_event_mmap_page *metadata_page, display_order order, uint64_t start_addr, uint64_t end_addr);
+void print_samples(struct perf_event_mmap_page *metadata_page, display_order order, uint64_t start_addr, uint64_t end_addr, int nb_samples_estimated);
+char* concat(const char *s1, const char *s2);
 
 #endif

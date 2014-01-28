@@ -62,7 +62,7 @@ static int is_served_by_local_cache(union perf_mem_data_src data_src) {
   }
 }
 
-static char* concat(const char *s1, const char *s2) {
+char* concat(const char *s1, const char *s2) {
   char *result = malloc(strlen(s1) + strlen(s2) + 1);
   if (result == NULL) {
     return "malloc failed in concat\n";
@@ -149,12 +149,15 @@ static int compar_addr(const void* a1, const void* a2) {
   }
 }
 
-void print_samples(struct perf_event_mmap_page *metadata_page, display_order order, uint64_t start_addr, uint64_t end_addr) {
+void print_samples(struct perf_event_mmap_page *metadata_page, display_order order, uint64_t start_addr, uint64_t end_addr, int nb_samples_estimated) {
 
   int remote_cache_count = 0;
   int memory_count = 0;
   int cache_count = 0;
   int in_malloced_count = 0;
+  int in_malloced_count_4 = 0;
+  int in_malloced_count_3 = 0;
+  int in_malloced_count_2 = 0;
   int nb_samples = 0;
 
   if (metadata_page != NULL) {
@@ -181,6 +184,15 @@ void print_samples(struct perf_event_mmap_page *metadata_page, display_order ord
 	struct sample *sample = (struct sample *)((char *)(header) + 8);
 	memcpy(&samples[index], sample, sizeof(struct sample));
 	index++;
+	if (sample->addr >= start_addr && sample->addr <= start_addr + (end_addr - start_addr) / 4) {
+	  in_malloced_count_4++;
+	}
+	if (sample->addr >= start_addr && sample->addr <= start_addr + (end_addr - start_addr) / 3) {
+	  in_malloced_count_3++;
+	}
+	if (sample->addr >= start_addr && sample->addr <= start_addr + (end_addr - start_addr) / 2) {
+	  in_malloced_count_2++;
+	}
 	if (sample->addr >= start_addr && sample->addr <= end_addr) {
 	  in_malloced_count++;
 	}
@@ -224,8 +236,12 @@ void print_samples(struct perf_event_mmap_page *metadata_page, display_order ord
     nb_samples = 198;
   }
 
+  printf("%-80s = %15d (expected = %d)\n", "samples count (core event: MEM_INST_RETIRED.LATENCY)", nb_samples, nb_samples_estimated);
   printf("\n");
   printf("%d samples in malloced memory on %d samples (%.3f%%)\n", in_malloced_count, nb_samples, (in_malloced_count / (float) nb_samples * 100));
+  printf("%d samples in first half   of malloced memory on %d samples (%.3f%%)\n", in_malloced_count_2, nb_samples, (in_malloced_count_2 / (float) nb_samples * 100));
+  printf("%d samples in first third   of malloced memory on %d samples (%.3f%%)\n", in_malloced_count_3, nb_samples, (in_malloced_count_3 / (float) nb_samples * 100));
+  printf("%d samples in first quarter of malloced memory on %d samples (%.3f%%)\n", in_malloced_count_4, nb_samples, (in_malloced_count_4 / (float) nb_samples * 100));
   printf("\n");
   printf("%d remote cache samples on %d samples (%.3f%%)\n", remote_cache_count, nb_samples, (remote_cache_count / (float) nb_samples * 100));
   printf("%d local  cache samples on %d samples (%.3f%%)\n", cache_count, nb_samples, (cache_count / (float) nb_samples * 100));
