@@ -8,6 +8,7 @@
 \usepackage{subcaption}
 \usepackage{filecontents}
 \usepackage{pdflscape}
+\usepackage{array}
 
 \begin{document}
 
@@ -27,23 +28,34 @@ Our bench is the following :
   \frac{nb\_loads}{frequency}$ but it's not the case.
 \end{itemize}
 
+\begin{figure}[h]
+  \begin{tabular}{|c|c|c|c|c|c|c|c|}
+    \hline
+    L1 & L2    & L3    & L3 snoop clean & L3 snoop mod. & Remote Cache & RAM & Rem. RAM \\
+    \hline
+    6  & 12-19 & 40-50 &                &               & 200          &     & 330      \\
+    \hline
+  \end{tabular}
+  \caption{Latencies for different memories in cycles}
+\end{figure}
+
 \begin{filecontents}{seq.dat}
 seq_data
 \end{filecontents}
 
 \begin{figure}[h]
   \begin{tikzpicture}
-    \pgfplotsset{
-      log basis x={2},
-      x tick label style={/pgf/number format/1000 sep=\,},
-      log base 10 number format code/.code={
-        $\pgfmathparse{10^(#1)}\pgfmathprintnumber{\pgfmathresult}$
-      }
-    }
-    \begin{semilogxaxis}[legend pos=north west,ymin=0,ymax=100, ,xlabel={memory size (MB)},ylabel={\% of memory samples}]
+    % \pgfplotsset{
+    %   log basis x={2},
+    %   x tick label style={/pgf/number format/1000 sep=\,},
+    %   log base 10 number format code/.code={
+    %     $\pgfmathparse{10^(#1)}\pgfmathprintnumber{\pgfmathresult}$
+    %   }
+    % }
+    \begin{axis}[legend pos=north west, ymin=0, ymax=100, xlabel={memory size (MB)}, ylabel={\% of memory samples}]
 seq_plot
 seq_legend
-    \end{semilogxaxis}
+    \end{axis}
   \end{tikzpicture}
   \caption{percentage of memory samples for different memory size in the sequential
     accesses case with prefetching enabled.}
@@ -55,17 +67,17 @@ rand_data
 
 \begin{figure}[h]
   \begin{tikzpicture}
-    \pgfplotsset{
-      log basis x={2},
-      x tick label style={/pgf/number format/1000 sep=\,},
-      log base 10 number format code/.code={
-        $\pgfmathparse{10^(#1)}\pgfmathprintnumber{\pgfmathresult}$
-      }
-    }
-    \begin{semilogxaxis}[legend pos=north west,ymin=0,ymax=100,xlabel={memory size (MB)},ylabel={\% of memory samples}]
+    % \pgfplotsset{
+    %   log basis x={2},
+    %   x tick label style={/pgf/number format/1000 sep=\,},
+    %   log base 10 number format code/.code={
+    %     $\pgfmathparse{10^(#1)}\pgfmathprintnumber{\pgfmathresult}$
+    %   }
+    % }
+    \begin{axis}[legend pos=north west,ymin=0,ymax=100,xlabel={memory size (MB)},ylabel={\% of memory samples}]
 rand_plot
 rand_legend
-    \end{semilogxaxis}
+    \end{axis}
   \end{tikzpicture}
   \caption{percentage of memory samples for different memory size in the random
     accesses case with prefetching enabled.}

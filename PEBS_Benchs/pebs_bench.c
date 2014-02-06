@@ -86,11 +86,23 @@ void fill_memory_rand(size_t size, ELEM_TYPE *memory, size_t nb_elems) {
    * element using the shuffled memory region.
    */
   int i;
+  /* int nb_cache_line_changes = 0; */
   for(i = 0; i < nb_elems - 1; i++) {
     memory[i] = (uint64_t)&memory[rand_memory[i + 1].index];
+    /* if (i > 0 && memory[i] - memory[i - 1] > 64) { */
+    /*   nb_cache_line_changes++; */
+    /* } */
   }
+  /* printf("nb_cache_line_changes = %d\n", nb_cache_line_changes); */
   memory[i] = (uint64_t)&memory[0];
+  free(rand_memory);
 }
+
+#define ONE addr = (uint64_t *)*addr;
+#define FOUR ONE ONE ONE ONE
+#define SIXTEEN FOUR FOUR FOUR FOUR
+#define THIRTY_TWO SIXTEEN SIXTEEN
+#define SIXTY_FOUR THIRTY_TWO THIRTY_TWO
 
 /**
  * Read the given memory region. Several accesses are done in each
@@ -111,43 +123,7 @@ void read_memory(uint64_t *memory, size_t size) {
   register int64_t nb_elem_remaining = size / sizeof(ELEM_TYPE);
 
   while (nb_elem_remaining > 0) {
-
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-    addr = (uint64_t *)*addr;
-
+    THIRTY_TWO
     nb_elem_remaining -= 32;
   }
 }
@@ -164,17 +140,6 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
   printf("Accessing %lu mega bytes in %d %ld bytes accesses\n", (size_in_bytes / 1000000), nb_elems, sizeof(ELEM_TYPE));
 
   /**
-   * Pin process on core CPU
-   */
-  cpu_set_t mask;
-  CPU_ZERO(&mask);
-  CPU_SET(CPU, &mask);
-  if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
-    printf("sched_setaffinity failed: %s\n", strerror(errno));
-    return -1;
-  }
-
-  /**
    * Allocates and fills memory. Because the memory is filled, all its
    * pages are touched and as a consequence, no page faults will occur
    * during the measurement.
@@ -187,6 +152,7 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     memory = malloc(size_in_bytes);
   }
   assert(memory);
+  printf("Memory is betweent %p and %p\n", memory, memory + nb_elems);
   memset(memory, -1, size_in_bytes);
   if (access_mode == access_seq) {
     fill_memory_sequential(size_in_bytes, memory, nb_elems);
@@ -215,10 +181,10 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
   struct perf_event_attr pe_attr_unc_memory;
   memset(&pe_attr_unc_memory, 0, sizeof(pe_attr_unc_memory));
   pe_attr_unc_memory.size = sizeof(pe_attr_unc_memory);
-  pe_attr_unc_memory.type = 6; // /sys/bus/event_source/uncore/type
+  pe_attr_unc_memory.type = 6; // /sys/bus/event_source/devices/uncore/type
   pe_attr_unc_memory.config = 0x072c; // QMC_NORMAL_READS.ANY
   pe_attr_unc_memory.disabled = 1;
-  int memory_reads_fd = perf_event_open(&pe_attr_unc_memory, -1, numa_node_of_cpu(CPU), -1, 0);
+  int memory_reads_fd = perf_event_open(&pe_attr_unc_memory, -1, NUMA_NODE, -1, 0);
   if (memory_reads_fd == -1) {
     printf("perf_event_open failed for uncore memory: %s\n", strerror(errno));
     return -1;
@@ -251,6 +217,22 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
   int inst_fd = perf_event_open(&pe_attr_inst, 0, CPU, -1, 0);
   if (inst_fd == -1) {
     printf("perf_event_open failed for instructions: %s\n", strerror(errno));
+    return -1;
+  }
+
+  // Manualy set and open remote cache counting event
+  struct perf_event_attr pe_attr_remote_cache;
+  memset(&pe_attr_remote_cache, 0, sizeof(pe_attr_remote_cache));
+  pe_attr_remote_cache.size = sizeof(pe_attr_remote_cache);
+  pe_attr_remote_cache.type = PERF_TYPE_RAW;
+  pe_attr_remote_cache.config = 0x5301b7; // OFF_CORE_RESPONSE_0
+  pe_attr_remote_cache.config1 = 0x1033; // REMOTE_CACHE_ FWD
+  pe_attr_remote_cache.disabled = 1;
+  pe_attr_remote_cache.exclude_kernel = 1;
+  pe_attr_remote_cache.exclude_hv = 1;
+  int remote_cache_fd = perf_event_open(&pe_attr_remote_cache, 0, CPU, -1, 0);
+  if (remote_cache_fd == -1) {
+    printf("perf_event_open failed for remote cache: %s\n", strerror(errno));
     return -1;
   }
 
@@ -294,43 +276,58 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
   ioctl(page_faults_fd, PERF_EVENT_IOC_ENABLE, 0);
   ioctl(memory_sampling_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(memory_sampling_fd, PERF_EVENT_IOC_ENABLE, 0);
+  ioctl(remote_cache_fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(remote_cache_fd, PERF_EVENT_IOC_ENABLE, 0);
 
 
   // Access memory
   read_memory(memory, size_in_bytes);
 
   // Stop measuring
+  ioctl(remote_cache_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(memory_sampling_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(page_faults_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(inst_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(loads_fd, PERF_EVENT_IOC_DISABLE, 0);
   ioctl(memory_reads_fd, PERF_EVENT_IOC_DISABLE, 0);
+  gettimeofday(&t2, NULL);
+  elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
+  elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 
   // Print results
+  uint64_t remote_cache_count;
   uint64_t memory_reads_count;
   uint64_t loads_count;
   uint64_t insts_count;
   uint64_t page_faults_count;
+  read(remote_cache_fd, &remote_cache_count, sizeof(remote_cache_count));
   read(memory_reads_fd, &memory_reads_count, sizeof(memory_reads_count));
   read(loads_fd, &loads_count, sizeof(loads_count));
   read(inst_fd, &insts_count, sizeof(insts_count));
   read(page_faults_fd, &page_faults_count, sizeof(page_faults_count));
-  gettimeofday(&t2, NULL);
-  elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
-  elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;
   printf("\n");
   printf("%-80s = %15" PRIu64 "\n", "Page faults count", page_faults_count);
   printf("%-80s = %15.3f \n",       "time (milliseconds)", elapsedTime);
-  printf("%-80s = %15" PRId64 " (expected = %" PRId64 ")\n", "64 bytes cache line reads from RAM count (uncore event: QMC_NORMAL_READS.ANY)", memory_reads_count, (size_in_bytes / 64));
+  if (access_mode == access_seq) {
+    printf("%-80s = %15" PRId64 " (expected = %" PRId64 " considering each cache line is loaded once only)\n", "64 bytes cache line reads from RAM count (uncore event: QMC_NORMAL_READS.ANY)", memory_reads_count, (size_in_bytes / 64));
+  } else {
+    printf("%-80s = %15" PRId64 "\n", "64 bytes cache line reads from RAM count (uncore event: QMC_NORMAL_READS.ANY)", memory_reads_count);
+  }
   printf("%-80s = %15" PRId64 "\n", "instructions count (core event: INST_RETIRED.ANY)", insts_count);
   printf("%-80s = %15" PRId64 " (expected = %d)\n", "loads count (core event: MEM_INST_RETIRED.LOADS)", loads_count, nb_elems);
+  printf("%-80s = %15" PRId64 "\n", "remote cache count (core event: OFF_CORE_RESPONSE_0)", remote_cache_count);
+
   if (metadata_page->data_head > mmap_len) {
     printf("more samples than space in mmap allocated ring buffer\n");
     return -1;
   }
   print_samples(metadata_page, ADDR, (uint64_t)memory, (uint64_t)memory + size_in_bytes, nb_elems / period);
-  //close(memory_reads_fd);
+  close(remote_cache_fd);
   close(memory_sampling_fd);
+  close(memory_reads_fd);
+  close(loads_fd);
+  close(inst_fd);
+  close(page_faults_fd);
   if (numa_available() == -1 && NUMA_ALLOC) {
     free(memory);
   } else {
@@ -344,6 +341,17 @@ void usage(const char *prog_name) {
 }
 
 int main(int argc, char **argv) {
+
+  /**
+   * Pin process on core CPU
+   */
+  cpu_set_t mask;
+  CPU_ZERO(&mask);
+  CPU_SET(CPU, &mask);
+  if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
+    printf("sched_setaffinity failed: %s\n", strerror(errno));
+    return -1;
+  }
 
   /**
    * Check and get arguments.

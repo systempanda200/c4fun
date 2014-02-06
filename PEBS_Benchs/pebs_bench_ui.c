@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-//#define PRINT
+#define PRINT
 
 static int is_served_by_memory(union perf_mem_data_src data_src) {
   if (data_src.mem_lvl & PERF_MEM_LVL_MISS) {
@@ -70,6 +70,25 @@ char* concat(const char *s1, const char *s2) {
   strcpy(result, s1);
   strcat(result, s2);
   return result;
+}
+
+char * get_snoop(union perf_mem_data_src data_src) {
+  if (data_src.mem_snoop & PERF_MEM_SNOOP_NA) {
+    return "NA";
+  }
+  if (data_src.mem_snoop & PERF_MEM_SNOOP_NONE) {
+    return "none";
+  }
+  if (data_src.mem_snoop & PERF_MEM_SNOOP_HIT) {
+    return "hit";
+  }
+  if (data_src.mem_snoop & PERF_MEM_SNOOP_MISS) {
+    return "miss";
+  }
+  if (data_src.mem_snoop & PERF_MEM_SNOOP_HITM) {
+    return "hit modified";
+  }
+  return "NULL";
 }
 
 char * get_data_src_level(union perf_mem_data_src data_src) {
@@ -213,6 +232,8 @@ void print_samples(struct perf_event_mmap_page *metadata_page, display_order ord
     // Sort the list if required
     qsort(samples, nb_samples, sizeof(struct sample), compar_addr);
 
+    printf("%-80s = %15d (expected = %d)\n", "samples count (core event: MEM_INST_RETIRED.LATENCY)", nb_samples, nb_samples_estimated);
+
     // Print the list of samples
 #ifdef PRINT
     printf("\n");
@@ -227,7 +248,8 @@ void print_samples(struct perf_event_mmap_page *metadata_page, display_order ord
       }
       printf("%-10" PRIu64, sample -> weight);
       char *level = get_data_src_level(sample -> data_src);
-      printf("%s", level);
+      printf("%-30s", level);
+      printf("%-10s", get_snoop(sample -> data_src));
       free(level);
       printf("\n");
     }
@@ -236,7 +258,6 @@ void print_samples(struct perf_event_mmap_page *metadata_page, display_order ord
     nb_samples = 198;
   }
 
-  printf("%-80s = %15d (expected = %d)\n", "samples count (core event: MEM_INST_RETIRED.LATENCY)", nb_samples, nb_samples_estimated);
   printf("\n");
   printf("%d samples in malloced memory on %d samples (%.3f%%)\n", in_malloced_count, nb_samples, (in_malloced_count / (float) nb_samples * 100));
   printf("%d samples in first half   of malloced memory on %d samples (%.3f%%)\n", in_malloced_count_2, nb_samples, (in_malloced_count_2 / (float) nb_samples * 100));
