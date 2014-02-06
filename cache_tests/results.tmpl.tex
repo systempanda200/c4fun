@@ -1,0 +1,34 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage{tikz}
+\usepackage{numprint}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{pgfplots}
+\usepackage{subcaption}
+\usepackage{filecontents}
+\usepackage{pdflscape}
+\usepackage{array}
+
+\begin{document}
+
+\begin{filecontents}{data}
+_data_
+\end{filecontents}
+
+\begin{figure}[h]
+  \begin{tikzpicture}
+    \pgfplotsset{
+      log basis x={2},
+    }
+    \begin{semilogxaxis}[legend pos=north west, xmin=0, xlabel={Memory Size (KiB)}, ylabel={\% Read Time (ms)}]
+      \addplot table[mark=none, x index=0,y index=1,col sep=comma] {data};
+      \draw ({axis cs:32,0}|-{rel axis cs:0,0}) -- ({axis cs:32,0}|-{rel axis cs:0,1}) node [midway, sloped, above] {L1d=32K};
+      \draw ({axis cs:256,0}|-{rel axis cs:0,0}) -- ({axis cs:256,0}|-{rel axis cs:0,1}) node [midway, sloped, above] {L2=256K};
+      \draw ({axis cs:3072,0}|-{rel axis cs:0,0}) -- ({axis cs:3072,0}|-{rel axis cs:0,1}) node [midway, sloped, above] {L3=3MiB};
+    \end{semilogxaxis}
+  \end{tikzpicture}
+  \caption{Execution time for 1000000 reads against read memory size}
+\end{figure}
+
+\end{document}
