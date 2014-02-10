@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <numa.h>
+#include <numaif.h>
 #include <assert.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -15,87 +16,33 @@
 
 #include <sys/ioctl.h>
 
+#include "mem_alloc.h"
 #include "pebs_bench.h"
 #include "pebs_bench_ui.h"
 
-#define CPU 8
+#define CPU 9
 #define NUMA_NODE 0
-#define NUMA_ALLOC 1 // Set to one to use numa_alloc
+#define NUMA_ALLOC 1 /* Set to one to use numa_alloc */
+
+/* Used to control what we count */
+/* #define CORE_COUNT_INST */
+/* #define CORE_COUNT_LOADS */
+#define CORE_COUNT_REMOTE_CACHE
+#define CORE_COUNT_LOCAL_DRAM
+#define CORE_COUNT_REMOTE_DRAM
+#define CORE_PEBS_SAMPLING
+#define UNCORE_COUNT_READS
 
 #define ELEM_TYPE uint64_t
 
-
-static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {
-    int ret = syscall(__NR_perf_event_open, hw_event, pid, cpu,
-                   group_fd, flags);
-    return ret;
-}
-
-/**
- * Fills a memory region of the given size with values indicating the
- * adress of the next element in the memory region.
- */
-void fill_memory_sequential(size_t size, uint64_t* memory, size_t nb_elems) {
-
-  int i;
-  for(i = 0; i < nb_elems - 1; i++) {
-    memory[i] = (uint64_t)&memory[i + 1];
-  }
-  memory[i] = (uint64_t)&memory[0];
-}
-
-
-/**
- * Structure used along with the following compar function to shuffle
- * an array of N elements.
- */
-struct rand_struct {
-  int index;
-  int rand;
-};
-
-static int compar(const void* a1, const void* a2) {
-  struct rand_struct *a = (struct rand_struct*) a1;
-  struct rand_struct *b = (struct rand_struct*) a2;
-  return a->rand - b->rand;
-}
-
-/**
- * Fills a memory region of the given size with values indicating the
- * adress an other random element in the memory region. All the
- * elements adresses are present in the filled region.
- */
-void fill_memory_rand(size_t size, ELEM_TYPE *memory, size_t nb_elems) {
-
-  /**
-   * Create another memory region and shuffle it.
-   */
-  size_t rand_memory_size = nb_elems * sizeof(struct rand_struct);
-  struct rand_struct *rand_memory = malloc(rand_memory_size);
-  memset(rand_memory, 0, rand_memory_size);
-  assert(rand_memory);
-  unsigned int seed = 1;
-  for (int i = 0; i < nb_elems; i++) {
-    rand_memory[i].index = i;
-    rand_memory[i].rand = rand_r(&seed);
-  }
-  qsort(&rand_memory[1], nb_elems - 1, sizeof(*rand_memory), compar);
-
-  /**
-   * Fills the returned memory region with pointers to a next random
-   * element using the shuffled memory region.
-   */
-  int i;
-  /* int nb_cache_line_changes = 0; */
-  for(i = 0; i < nb_elems - 1; i++) {
-    memory[i] = (uint64_t)&memory[rand_memory[i + 1].index];
-    /* if (i > 0 && memory[i] - memory[i - 1] > 64) { */
-    /*   nb_cache_line_changes++; */
-    /* } */
-  }
-  /* printf("nb_cache_line_changes = %d\n", nb_cache_line_changes); */
-  memory[i] = (uint64_t)&memory[0];
-  free(rand_memory);
+static long perf_event_open(struct perf_event_attr *hw_event,
+			    pid_t pid,
+			    int cpu,
+			    int group_fd,
+			    unsigned long flags) {
+  int ret = syscall(__NR_perf_event_open, hw_event, pid, cpu,
+		    group_fd, flags);
+  return ret;
 }
 
 #define ONE addr = (uint64_t *)*addr;
@@ -124,20 +71,13 @@ void read_memory(uint64_t *memory, size_t size) {
 
   while (nb_elem_remaining > 0) {
     THIRTY_TWO
-    nb_elem_remaining -= 32;
+      nb_elem_remaining -= 32;
   }
 }
 
-enum access_mode_t {
-  access_seq,
-  access_random
-};
-
-
-int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t period) {
-
-  int nb_elems = size_in_bytes / sizeof(ELEM_TYPE);
-  printf("Accessing %lu mega bytes in %d %ld bytes accesses\n", (size_in_bytes / 1000000), nb_elems, sizeof(ELEM_TYPE));
+int run_benchs(size_t size_in_bytes,
+	       enum access_mode_t access_mode,
+	       uint64_t period) {
 
   /**
    * Allocates and fills memory. Because the memory is filled, all its
@@ -152,13 +92,16 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     memory = malloc(size_in_bytes);
   }
   assert(memory);
-  printf("Memory is betweent %p and %p\n", memory, memory + nb_elems);
   memset(memory, -1, size_in_bytes);
-  if (access_mode == access_seq) {
-    fill_memory_sequential(size_in_bytes, memory, nb_elems);
-  } else {
-    fill_memory_rand(size_in_bytes, memory, nb_elems);
-  }
+  fill_memory(memory, size_in_bytes, access_mode);
+
+  void *to_chk = memory;
+ int status[1];
+ int ret_code;
+ status[0] = -1;
+ ret_code = move_pages(0 /*self memory */, 1, &to_chk, NULL, status, 0);
+ printf("Memory at %p is at %d node (retcode %d)\n", to_chk, status[0], ret_code);
+
   mlockall(MCL_CURRENT | MCL_FUTURE); // Ensure pages are not swapped
 
   /**
@@ -177,7 +120,7 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     return -1;
   }
 
-  // Manualy set and open 64 bytes cache line reads from memory counting event
+#ifdef UNCORE_COUNT_READS
   struct perf_event_attr pe_attr_unc_memory;
   memset(&pe_attr_unc_memory, 0, sizeof(pe_attr_unc_memory));
   pe_attr_unc_memory.size = sizeof(pe_attr_unc_memory);
@@ -189,8 +132,9 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     printf("perf_event_open failed for uncore memory: %s\n", strerror(errno));
     return -1;
   }
+#endif
 
-  // Manualy set and open load retired counting event
+#ifdef CORE_COUNT_LOADS
   struct perf_event_attr pe_attr_loads;
   memset(&pe_attr_loads, 0, sizeof(pe_attr_loads));
   pe_attr_loads.size = sizeof(pe_attr_loads);
@@ -204,8 +148,9 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     printf("perf_event_open failed for core loads: %s\n", strerror(errno));
     return -1;
   }
+#endif
 
-  // Manualy set and open instructions retired counting event
+#ifdef CORE_COUNT_INST
   struct perf_event_attr pe_attr_inst;
   memset(&pe_attr_inst, 0, sizeof(pe_attr_inst));
   pe_attr_inst.size = sizeof(pe_attr_inst);
@@ -219,14 +164,15 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     printf("perf_event_open failed for instructions: %s\n", strerror(errno));
     return -1;
   }
+#endif
 
-  // Manualy set and open remote cache counting event
+#ifdef CORE_COUNT_REMOTE_CACHE
   struct perf_event_attr pe_attr_remote_cache;
   memset(&pe_attr_remote_cache, 0, sizeof(pe_attr_remote_cache));
   pe_attr_remote_cache.size = sizeof(pe_attr_remote_cache);
   pe_attr_remote_cache.type = PERF_TYPE_RAW;
   pe_attr_remote_cache.config = 0x5301b7; // OFF_CORE_RESPONSE_0
-  pe_attr_remote_cache.config1 = 0x1033; // REMOTE_CACHE_ FWD
+  pe_attr_remote_cache.config1 = 0x1033; // REMOTE_CACHE_FWD
   pe_attr_remote_cache.disabled = 1;
   pe_attr_remote_cache.exclude_kernel = 1;
   pe_attr_remote_cache.exclude_hv = 1;
@@ -235,8 +181,43 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
     printf("perf_event_open failed for remote cache: %s\n", strerror(errno));
     return -1;
   }
+#endif
 
-  // Manualy set and open memory sampling event
+#ifdef CORE_COUNT_LOCAL_DRAM
+  struct perf_event_attr pe_attr_local_ram;
+  memset(&pe_attr_local_ram, 0, sizeof(pe_attr_local_ram));
+  pe_attr_local_ram.size = sizeof(pe_attr_local_ram);
+  pe_attr_local_ram.type = PERF_TYPE_RAW;
+  pe_attr_local_ram.config = 0x5301bb; // OFF_CORE_RESPONSE_1
+  pe_attr_local_ram.config1 = 0x4033; // LOCAL_DRAM
+  pe_attr_local_ram.disabled = 1;
+  pe_attr_local_ram.exclude_kernel = 1;
+  pe_attr_local_ram.exclude_hv = 1;
+  int local_ram_fd = perf_event_open(&pe_attr_local_ram, 0, CPU, -1, 0);
+  if (local_ram_fd == -1) {
+    printf("perf_event_open failed for local dram: %s\n", strerror(errno));
+    return -1;
+  }
+#endif
+
+#ifdef CORE_COUNT_REMOTE_DRAM
+  struct perf_event_attr pe_attr_remote_ram;
+  memset(&pe_attr_remote_ram, 0, sizeof(pe_attr_remote_ram));
+  pe_attr_remote_ram.size = sizeof(pe_attr_remote_ram);
+  pe_attr_remote_ram.type = PERF_TYPE_RAW;
+  pe_attr_remote_ram.config = 0x5301bb; // OFF_CORE_RESPONSE_1
+  pe_attr_remote_ram.config1 = 0x2033; // REMOTE_DRAM
+  pe_attr_remote_ram.disabled = 1;
+  pe_attr_remote_ram.exclude_kernel = 1;
+  pe_attr_remote_ram.exclude_hv = 1;
+  int remote_ram_fd = perf_event_open(&pe_attr_remote_ram, 0, CPU, -1, 0);
+  if (remote_ram_fd == -1) {
+    printf("perf_event_open failed for remote dram: %s\n", strerror(errno));
+    return -1;
+  }
+#endif
+
+#ifdef CORE_PEBS_SAMPLING
   struct perf_event_attr pe_attr_sampling;
   memset(&pe_attr_sampling, 0, sizeof(pe_attr_sampling));
   pe_attr_sampling.size = sizeof(pe_attr_sampling);
@@ -261,73 +242,136 @@ int run_benchs(size_t size_in_bytes, enum access_mode_t access_mode, uint64_t pe
   	     strerror (errno), errno);
     return -1;
   }
+#endif
 
   // Starts measuring
   struct timeval t1, t2;
   double elapsedTime;
   gettimeofday(&t1, NULL);
+#ifdef UNCORE_COUNT_READS
   ioctl(memory_reads_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(memory_reads_fd, PERF_EVENT_IOC_ENABLE, 0);
+#endif
+#ifdef CORE_COUNT_LOADS
   ioctl(loads_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(loads_fd, PERF_EVENT_IOC_ENABLE, 0);
+#endif
+#ifdef CORE_COUNT_INST
   ioctl(inst_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(inst_fd, PERF_EVENT_IOC_ENABLE, 0);
+#endif
   ioctl(page_faults_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(page_faults_fd, PERF_EVENT_IOC_ENABLE, 0);
+#ifdef CORE_PEBS_SAMPLING
   ioctl(memory_sampling_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(memory_sampling_fd, PERF_EVENT_IOC_ENABLE, 0);
+#endif
+#ifdef CORE_COUNT_REMOTE_CACHE
   ioctl(remote_cache_fd, PERF_EVENT_IOC_RESET, 0);
   ioctl(remote_cache_fd, PERF_EVENT_IOC_ENABLE, 0);
-
+#endif
+#ifdef CORE_COUNT_LOCAL_DRAM
+  ioctl(local_ram_fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(local_ram_fd, PERF_EVENT_IOC_ENABLE, 0);
+#endif
+#ifdef CORE_COUNT_REMOTE_DRAM
+  ioctl(remote_ram_fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(remote_ram_fd, PERF_EVENT_IOC_ENABLE, 0);
+#endif
 
   // Access memory
   read_memory(memory, size_in_bytes);
 
   // Stop measuring
-  ioctl(remote_cache_fd, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(memory_sampling_fd, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(page_faults_fd, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(inst_fd, PERF_EVENT_IOC_DISABLE, 0);
-  ioctl(loads_fd, PERF_EVENT_IOC_DISABLE, 0);
+#ifdef UNCORE_COUNT_READS
   ioctl(memory_reads_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+#ifdef CORE_COUNT_LOADS
+  ioctl(loads_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+#ifdef CORE_COUNT_INST
+  ioctl(inst_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+  ioctl(page_faults_fd, PERF_EVENT_IOC_DISABLE, 0);
+#ifdef CORE_PEBS_SAMPLING
+  ioctl(memory_sampling_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+#ifdef CORE_COUNT_REMOTE_CACHE
+  ioctl(remote_cache_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+#ifdef CORE_COUNT_LOCAL_DRAM
+  ioctl(local_ram_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
+#ifdef CORE_COUNT_REMOTE_DRAM
+  ioctl(remote_ram_fd, PERF_EVENT_IOC_DISABLE, 0);
+#endif
   gettimeofday(&t2, NULL);
   elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;
   elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 
   // Print results
+  int nb_elems = size_in_bytes / sizeof(ELEM_TYPE);
+#ifdef CORE_COUNT_REMOTE_DRAM
+  uint64_t remote_ram_count;
+  read(remote_ram_fd, &remote_ram_count, sizeof(remote_ram_count));
+#endif
+#ifdef CORE_COUNT_LOCAL_DRAM
+  uint64_t local_ram_count;
+  read(local_ram_fd, &local_ram_count, sizeof(local_ram_count));
+#endif
+#ifdef CORE_COUNT_REMOTE_CACHE
   uint64_t remote_cache_count;
-  uint64_t memory_reads_count;
-  uint64_t loads_count;
-  uint64_t insts_count;
-  uint64_t page_faults_count;
   read(remote_cache_fd, &remote_cache_count, sizeof(remote_cache_count));
+#endif
+#ifdef UNCORE_COUNT_READS
+  uint64_t memory_reads_count;
   read(memory_reads_fd, &memory_reads_count, sizeof(memory_reads_count));
+#endif
+#ifdef CORE_COUNT_LOADS
+  uint64_t loads_count;
   read(loads_fd, &loads_count, sizeof(loads_count));
+#endif
+#ifdef CORE_COUNT_INST
+  uint64_t insts_count;
   read(inst_fd, &insts_count, sizeof(insts_count));
+#endif
+  uint64_t page_faults_count;
   read(page_faults_fd, &page_faults_count, sizeof(page_faults_count));
   printf("\n");
-  printf("%-80s = %15" PRIu64 "\n", "Page faults count", page_faults_count);
   printf("%-80s = %15.3f \n",       "time (milliseconds)", elapsedTime);
+  printf("%-80s = %15" PRIu64 "\n", "Page faults count (software event)", page_faults_count);
+#ifdef UNCORE_COUNT_READS
   if (access_mode == access_seq) {
     printf("%-80s = %15" PRId64 " (expected = %" PRId64 " considering each cache line is loaded once only)\n", "64 bytes cache line reads from RAM count (uncore event: QMC_NORMAL_READS.ANY)", memory_reads_count, (size_in_bytes / 64));
   } else {
     printf("%-80s = %15" PRId64 "\n", "64 bytes cache line reads from RAM count (uncore event: QMC_NORMAL_READS.ANY)", memory_reads_count);
   }
+#endif
+#ifdef CORE_COUNT_INST
   printf("%-80s = %15" PRId64 "\n", "instructions count (core event: INST_RETIRED.ANY)", insts_count);
+#endif
+#ifdef CORE_COUNT_LOADS
   printf("%-80s = %15" PRId64 " (expected = %d)\n", "loads count (core event: MEM_INST_RETIRED.LOADS)", loads_count, nb_elems);
-  printf("%-80s = %15" PRId64 "\n", "remote cache count (core event: OFF_CORE_RESPONSE_0)", remote_cache_count);
+#endif
+#ifdef CORE_COUNT_REMOTE_CACHE
+  printf("%-80s = %15" PRId64 "\n", "remote cache count (core event: OFF_CORE_RESPONSE_0:REMOTE_CACHE_FWD)", remote_cache_count);
+#endif
+#ifdef CORE_COUNT_LOCAL_DRAM
+  printf("%-80s = %15" PRId64 "\n", "local memory count (core event: OFF_CORE_RESPONSE_1:LOCAL_DRAM)", local_ram_count);
+#endif
+#ifdef CORE_COUNT_REMOTE_DRAM
+  printf("%-80s = %15" PRId64 "\n", "remote memory count (core event: OFF_CORE_RESPONSE_1:REMOTE_DRAM)", remote_ram_count);
+#endif
 
+#ifdef CORE_PEBS_SAMPLING
   if (metadata_page->data_head > mmap_len) {
     printf("more samples than space in mmap allocated ring buffer\n");
     return -1;
   }
+  printf("\n");
   print_samples(metadata_page, ADDR, (uint64_t)memory, (uint64_t)memory + size_in_bytes, nb_elems / period);
-  close(remote_cache_fd);
-  close(memory_sampling_fd);
-  close(memory_reads_fd);
-  close(loads_fd);
-  close(inst_fd);
-  close(page_faults_fd);
+#endif
+
   if (numa_available() == -1 && NUMA_ALLOC) {
     free(memory);
   } else {
@@ -365,7 +409,7 @@ int main(int argc, char **argv) {
   if (!strcmp(argv[2], "seq")) {
     access_mode = access_seq;
   } else if (!strcmp(argv[2], "rand")) {
-    access_mode = access_random;
+    access_mode = access_rand;
   } else {
     printf("Unknown access_mode %s\n", argv[2]);
     usage(argv[0]);

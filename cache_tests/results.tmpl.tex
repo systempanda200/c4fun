@@ -1,34 +1,56 @@
 \documentclass[10pt,a4paper]{article}
 
 \usepackage{tikz}
-\usepackage{numprint}
 \usepackage{graphicx}
-\usepackage{multirow}
 \usepackage{pgfplots}
 \usepackage{subcaption}
 \usepackage{filecontents}
+% \usepackage{showframe}
 \usepackage{pdflscape}
-\usepackage{array}
 
 \begin{document}
 
-\begin{filecontents}{data}
-_data_
+\begin{filecontents}{data_seq}
+  _data_seq_
 \end{filecontents}
 
-\begin{figure}[h]
-  \begin{tikzpicture}
-    \pgfplotsset{
-      log basis x={2},
-    }
-    \begin{semilogxaxis}[legend pos=north west, xmin=0, xlabel={Memory Size (KiB)}, ylabel={\% Read Time (ms)}]
-      \addplot table[mark=none, x index=0,y index=1,col sep=comma] {data};
-      \draw ({axis cs:32,0}|-{rel axis cs:0,0}) -- ({axis cs:32,0}|-{rel axis cs:0,1}) node [midway, sloped, above] {L1d=32K};
-      \draw ({axis cs:256,0}|-{rel axis cs:0,0}) -- ({axis cs:256,0}|-{rel axis cs:0,1}) node [midway, sloped, above] {L2=256K};
-      \draw ({axis cs:3072,0}|-{rel axis cs:0,0}) -- ({axis cs:3072,0}|-{rel axis cs:0,1}) node [midway, sloped, above] {L3=3MiB};
-    \end{semilogxaxis}
-  \end{tikzpicture}
-  \caption{Execution time for 1000000 reads against read memory size}
-\end{figure}
+\begin{filecontents}{data_rand}
+  _data_rand_
+\end{filecontents}
+
+\pgfplotsset{
+  log basis x={2},
+}
+
+\begin{landscape}
+  \begin{figure}[h]
+    \begin{subfigure}[b]{10cm}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[xmode=log, ymode=log, legend   pos=north   west,   xmin=0, xlabel={Memory Size (KiB)}, ylabel={\% Read Time (ns)}]
+          \addplot table[mark=none, x index=0,y index=1,col sep=comma] {data_seq};
+          \draw ({axis cs:_L1_,0}|-{rel axis cs:0,0}) -- ({axis cs:_L1_,0}|-{rel axis cs:0,1}) node[pos=0.75,sloped,above] {L1d=_L1_ KiB};
+          \draw ({axis cs:_L2_,0}|-{rel axis cs:0,0}) -- ({axis cs:_L2_,0}|-{rel axis cs:0,1}) node[pos=0.75,sloped,above] {L2=_L2_ KiB};
+          \draw ({axis cs:_L3_,0}|-{rel axis cs:0,0}) -- ({axis cs:_L3_,0}|-{rel axis cs:0,1}) node[pos=0.75,sloped,above] {L3=_L3_KiB};
+        \end{axis}
+      \end{tikzpicture}
+      \caption{Sequential accesses}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[b]{10cm}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[xmode=log, ymode=log, legend   pos=north   west,   xmin=0, xlabel={Memory Size (KiB)}, ylabel={\% Read Time (ns)}]
+          \addplot table[mark=none, x index=0,y index=1,col sep=comma] {data_rand};
+          \draw ({axis cs:_L1_,0}|-{rel axis cs:0,0}) -- ({axis cs:_L1_,0}|-{rel axis cs:0,1}) node[pos=0.75,sloped,above] {L1d=_L1_ KiB};
+          \draw ({axis cs:_L2_,0}|-{rel axis cs:0,0}) -- ({axis cs:_L2_,0}|-{rel axis cs:0,1}) node[pos=0.75,sloped,above] {L2=_L2_ KiB};
+          \draw ({axis cs:_L3_,0}|-{rel axis cs:0,0}) -- ({axis cs:_L3_,0}|-{rel axis cs:0,1}) node[pos=0.75,sloped,above] {L3=_L3_KiB};
+        \end{axis}
+      \end{tikzpicture}
+      \caption{Random accesses}
+    \end{subfigure}
+    \caption{Read time against read memory size}
+  \end{figure}
+\end{landscape}
 
 \end{document}

@@ -8,7 +8,7 @@
  * Fills the pointer's array of the given size with each element points
  * to the next element.
  */
-void fill_memory_seq(uint64_t *memory, size_t size) {
+static void fill_memory_seq(uint64_t *memory, size_t size) {
 
   size_t pointer_size = sizeof(char *);
   if (size % pointer_size != 0) {
@@ -22,7 +22,6 @@ void fill_memory_seq(uint64_t *memory, size_t size) {
   }
   memory[i] = (uint64_t)&memory[0];
 }
-
 
 /**
  * Structure used along with the following compar function to shuffle
@@ -45,7 +44,7 @@ static int compar(const void* a1, const void* a2) {
  * elements of the array are pointed to exactly by one other
  * element. The last element always points to the first one.
  */
-void fill_memory_rand(uint64_t *memory, size_t size) {
+static void fill_memory_rand(uint64_t *memory, size_t size) {
 
   size_t pointer_size = sizeof(void *);
   if (size % pointer_size != 0) {
@@ -78,4 +77,30 @@ void fill_memory_rand(uint64_t *memory, size_t size) {
   }
   memory[i] = (uint64_t)&memory[0];
   free(rand_memory);
+}
+
+/**
+ * Fills the given memory region either sequentially or pseudo
+ * randomly.
+ *
+ * If sequential, fills the pointer's array of the given size with
+ * each element points to the next element.
+ *
+ * If random, fills the pointer's array of the given size with each
+ * element pointing to another pseudo-random element in the array. All
+ * the elements of the array are pointed to exactly by one other
+ * element. The last element always points to the first one.
+ */
+void fill_memory(uint64_t *memory, size_t size, enum access_mode_t access_mode) {
+
+  switch (access_mode) {
+  case access_seq:
+    fill_memory_seq(memory, size);
+    break;
+  case access_rand:
+    fill_memory_rand(memory, size);
+    break;
+  default:
+    assert(NULL);
+  }
 }

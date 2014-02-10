@@ -19,8 +19,8 @@ LDFLAGS = $(ERROR_FLAGS) -lnuma
 all: clean pebs_bench
 
 pebs_bench: pebs_bench_ui pebs_bench.c
-	gcc $(CFLAGS) -c pebs_bench.c
-	gcc -o pebs_bench pebs_bench.o pebs_bench_ui.o $(LDFLAGS)
+	gcc $(CFLAGS) -c pebs_bench.c -I../mem_alloc
+	gcc -o pebs_bench pebs_bench.o pebs_bench_ui.o ../mem_alloc/mem_alloc.o $(LDFLAGS)
 
 pebs_bench_ui: pebs_bench_ui.c
 	gcc $(CFLAGS) -c pebs_bench_ui.c
